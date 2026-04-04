@@ -1,0 +1,10 @@
+﻿
+> extenology_crm_frontend@0.0.0 build
+> tsc -b && vite build
+
+src/pages/invoices/InvoiceDetail.tsx(3,22): error TS6133: 'updateInvoice' is declared but its value is never read.
+src/pages/invoices/InvoiceDetail.tsx(3,86): error TS6133: 'InvoiceItem' is declared but its value is never read.
+src/pages/invoices/InvoiceDetail.tsx(258,86): error TS2322: Type '{ label: string; value: string | number; editMode: boolean; type: string; name: string; onChange: () => void; }' is not assignable to type 'IntrinsicAttributes & { label: string; value: string | number | null | undefined; prefix?: string | undefined; }'.
+  Property 'editMode' does not exist on type 'IntrinsicAttributes & { label: string; value: string | number | null | undefined; prefix?: string | undefined; }'.
+src/pages/invoices/InvoiceDetail.tsx(259,96): error TS2322: Type '{ label: string; value: string | number; editMode: boolean; type: string; name: string; onChange: () => void; prefix: string; }' is not assignable to type 'IntrinsicAttributes & { label: string; value: string | number | null | undefined; prefix?: string | undefined; }'.
+  Property 'editMode' does not exist on type 'IntrinsicAttributes & { label: string; value: string | number | null | undefined; prefix?: string | undefined; }'.

@@ -22,27 +22,18 @@ export interface LoginResponse {
   refresh: string;
   access: string;
   is_logged_in: boolean;
-  roles: string[]; // Keep as string[] for login response convenience if backend handles it differently there, or update to Role[] if needed. The request says login res roles are strings.
+  role: string | null;
+  permissions: string[];
   is_superuser: boolean;
   user: User;
 }
 
-export const ROLES_PERMISSIONS: Record<string, string[]> = {
-  'DEVELOPER': ['/projects', '/activities', '/attendance', '/leaves', '/profile', '/employee-performance'],
-  'TEAMHEAD': ['/projects', '/teams', '/activities', '/attendance', '/leaves', '/profile', '/employee-performance', '/team-performance'],
-  'BILLING': [
-      '/dashboard', '/users', '/employees', '/projects', '/teams', '/infrastructure/servers', 
-      '/infrastructure/domains', '/invoices/company-summary', '/other-incomes', 
-      '/other-expenses', '/attendance', '/leaves', '/salaries', '/user-salaries', '/profile', '/company-profile', '/employee-performance', '/team-performance'
-  ],
-  'ADMIN': [
-      '/dashboard', '/reports', '/users', '/employees', '/projects', '/teams', '/infrastructure/servers', 
-      '/infrastructure/domains', '/attendance', '/leaves', '/salaries', '/user-salaries', '/profile', '/company-profile', '/employee-performance', '/team-performance'
-  ],
-  'SUPERADMIN': ['*'] // All access
-};
-
 export const login = async (username: string, password: string): Promise<LoginResponse> => {
   const response = await api.post<LoginResponse>('/token/', { username, password });
+  
+  // Store permissions for easy access
+  localStorage.setItem('permissions', JSON.stringify(response.data.permissions));
+  localStorage.setItem('user_role', response.data.role || '');
+  
   return response.data;
 };

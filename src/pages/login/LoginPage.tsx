@@ -19,7 +19,17 @@ const LoginPage: React.FC = () => {
             const response = await login(data.username, data.password);
             localStorage.setItem('access_token', response.access);
             localStorage.setItem('refresh_token', response.refresh);
-            localStorage.setItem('user', JSON.stringify(response.user));
+            
+            // Store comprehensive user data
+            const userData = {
+                ...response.user,
+                is_superuser: response.is_superuser,
+                role: response.role
+            };
+            localStorage.setItem('user', JSON.stringify(userData));
+            localStorage.setItem('user_role', response.role || '');
+            localStorage.setItem('permissions', JSON.stringify(response.permissions || []));
+            
             navigate('/welcome');
         } catch (error: any) {
             console.error('Login failed:', error);

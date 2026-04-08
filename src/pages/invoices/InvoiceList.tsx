@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getInvoices, deleteInvoice, getInvoicePdf } from './invoiceService';
+import { usePermission } from '../../hooks/usePermission';
 import type { Invoice } from './invoiceService';
 import {
     LayoutGrid,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 
 const InvoiceList: React.FC = () => {
+    const { hasPermission } = usePermission();
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -168,13 +170,15 @@ const InvoiceList: React.FC = () => {
                         <ArrowLeft size={20} className="text-muted group-hover:text-primary transition-colors" />
                         <span>Back to Summaries</span>
                     </button>
-                    <button
-                        onClick={() => navigate(`/invoices/client/${clientId}/new`)}
-                        className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20"
-                    >
-                        <Plus size={18} />
-                        <span>Create Invoice</span>
-                    </button>
+                    {hasPermission('add_invoice') && (
+                        <button
+                            onClick={() => navigate(`/invoices/client/${clientId}/new`)}
+                            className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-2xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-primary/20"
+                        >
+                            <Plus size={18} />
+                            <span>Create Invoice</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -285,8 +289,12 @@ const InvoiceList: React.FC = () => {
                                                     <button onClick={() => navigate(`/invoices/client/${clientId}/${invoice.id}/payments`)} className="p-2 text-muted hover:text-primary rounded-lg transition-all" title="Manage Payments"><CreditCard size={18} /></button>
                                                     <button onClick={() => navigate(`/invoices/client/${clientId}/${invoice.id}`)} className="p-2 text-muted hover:text-primary rounded-lg transition-all" title="View"><Eye size={18} /></button>
                                                     <button onClick={() => handleDownloadPdf(invoice.id, invoice.invoice_number)} className="p-2 text-muted hover:text-emerald-500 rounded-lg transition-all" title="Download PDF"><Download size={18} /></button>
-                                                    <button onClick={() => navigate(`/invoices/client/${clientId}/edit/${invoice.id}`)} className="p-2 text-muted hover:text-primary rounded-lg transition-all" title="Edit"><Edit2 size={18} /></button>
-                                                    <button onClick={() => handleDelete(invoice.id, invoice.invoice_number)} className="p-2 text-muted hover:text-rose-500 rounded-lg transition-all" title="Delete"><Trash2 size={18} /></button>
+                                                    {hasPermission('change_invoice') && (
+                                                        <button onClick={() => navigate(`/invoices/client/${clientId}/edit/${invoice.id}`)} className="p-2 text-muted hover:text-primary rounded-lg transition-all" title="Edit"><Edit2 size={18} /></button>
+                                                    )}
+                                                    {hasPermission('delete_invoice') && (
+                                                        <button onClick={() => handleDelete(invoice.id, invoice.invoice_number)} className="p-2 text-muted hover:text-rose-500 rounded-lg transition-all" title="Delete"><Trash2 size={18} /></button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -346,12 +354,14 @@ const InvoiceList: React.FC = () => {
                         <FileText className="text-muted/40 mx-auto mb-4" size={48} />
                         <h3 className="text-lg font-bold text-foreground">No invoices found</h3>
                         <p className="text-muted max-w-xs mx-auto mt-2">Start by creating your first invoice!</p>
-                        <button
-                            onClick={() => navigate(`/invoices/client/${clientId}/new`)}
-                            className="mt-6 px-6 py-2 bg-primary text-white font-semibold rounded-xl"
-                        >
-                            Create Invoice
-                        </button>
+                        {hasPermission('add_invoice') && (
+                            <button
+                                onClick={() => navigate(`/invoices/client/${clientId}/new`)}
+                                className="mt-6 px-6 py-2 bg-primary text-white font-semibold rounded-xl"
+                            >
+                                Create Invoice
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

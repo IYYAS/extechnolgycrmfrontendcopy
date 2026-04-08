@@ -13,6 +13,7 @@ const ProtectedRoute = ({ children }: { children?: React.ReactNode }) => {
 import UserList from './pages/user/UserList';
 import UserDetail from './pages/user/UserDetail';
 import UserForm from './pages/user/UserForm';
+import RoleManagement from './pages/user/RoleManagement';
 import TeamPerformance from './pages/user/TeamPerformance';
 import ProfilePage from './pages/user/ProfilePage';
 import EmployeePerformance from './pages/user/EmployeePerformance';
@@ -86,246 +87,327 @@ function App() {
         <ErrorBoundary>
             <ThemeProvider>
                 <BrowserRouter>
-                <Routes>
-                    <Route path="/login" element={<LoginPage />} />
+                    <Routes>
+                        <Route path="/login" element={<LoginPage />} />
 
-                    {/* Protected Routes Without Sidebar Layout */}
-                    <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
-                        <Route path="/welcome" element={<WelcomePage />} />
-                    </Route>
+                        {/* Protected Routes Without Sidebar Layout */}
+                        <Route element={<ProtectedRoute><Outlet /></ProtectedRoute>}>
+                            <Route path="/welcome" element={<WelcomePage />} />
+                        </Route>
 
-                    {/* Protected Routes with Sidebar Layout */}
-                    <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                        <Route path="/dashboard" element={
-                            <PermissionGate path="/dashboard">
-                                <AnalyticalDashboard />
-                            </PermissionGate>
-                        } />
-                        <Route path="/projects/statistics/details" element={
-                            <PermissionGate path="/dashboard">
-                                <ProjectStatisticsDetail />
-                            </PermissionGate>
-                        } />
-                        <Route path="/users" element={
-                            <PermissionGate path="/users">
-                                <UserList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/users/new" element={
-                            <PermissionGate path="/users">
-                                <UserForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/users/edit/:id" element={
-                            <PermissionGate path="/users">
-                                <UserForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/users/:id" element={
-                            <PermissionGate path="/users">
-                                <UserDetail />
-                            </PermissionGate>
-                        } />
-                        <Route path="/projects" element={<ProjectList />} />
-                        <Route path="/projects/new" element={<ProjectForm />} />
-                        <Route path="/projects/edit/:id" element={<ProjectForm />} />
-                        <Route path="/projects/:id" element={<ProjectDetail />} />
-                        <Route path="/teams" element={
-                            <PermissionGate path="/teams">
-                                <TeamList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/teams/new" element={
-                            <PermissionGate path="/teams">
-                                <TeamForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/teams/edit/:id" element={
-                            <PermissionGate path="/teams">
-                                <TeamForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/invoices/company-summary" element={
-                            <PermissionGate path="/invoices/company-summary">
-                                <InvoiceCompanyList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/invoices/new" element={
-                            <PermissionGate path="/invoices/company-summary">
-                                <InvoiceForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/invoices/client/:clientId" element={<InvoiceList />} />
-                        <Route path="/invoices/client/:clientId/new" element={<InvoiceForm />} />
-                        <Route path="/invoices/client/:clientId/edit/:id" element={<InvoiceForm />} />
-                        <Route path="/invoices/client/:clientId/:id" element={<InvoiceDetail />} />
-                        <Route path="/activities" element={<ActivityList />} />
-                        <Route path="/employees/:employeeId/activities" element={<ActivityList />} />
-                        <Route path="/activities/new" element={<ActivityForm />} />
-                        <Route path="/activities/edit/:id" element={<ActivityForm />} />
-                        <Route path="/leaves" element={<LeaveList />} />
-                        <Route path="/leaves/new" element={<LeaveForm />} />
-                        <Route path="/leaves/edit/:id" element={<LeaveForm />} />
-                        <Route path="/salaries" element={
-                            <PermissionGate path="/salaries">
-                                <SalaryList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/salaries/new" element={
-                            <PermissionGate path="/salaries">
-                                <SalaryForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/salaries/edit/:id" element={
-                            <PermissionGate path="/salaries">
-                                <SalaryForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/user-salaries" element={
-                            <PermissionGate path="/user-salaries">
-                                <UserSalaryList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/user-salaries/new" element={
-                            <PermissionGate path="/user-salaries">
-                                <UserSalaryForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/user-salaries/edit/:id" element={
-                            <PermissionGate path="/user-salaries">
-                                <UserSalaryForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/attendance" element={<AttendanceList />} />
-                        <Route path="/attendance/new" element={<AttendanceForm />} />
-                        <Route path="/attendance/edit/:id" element={<AttendanceForm />} />
-                        <Route path="/other-incomes" element={
-                            <PermissionGate path="/other-incomes">
-                                <OtherIncomeList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/other-incomes/new" element={
-                            <PermissionGate path="/other-incomes">
-                                <OtherIncomeForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/other-incomes/edit/:id" element={
-                            <PermissionGate path="/other-incomes">
-                                <OtherIncomeForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/other-expenses" element={
-                            <PermissionGate path="/other-expenses">
-                                <OtherExpenseList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/other-expenses/new" element={
-                            <PermissionGate path="/other-expenses">
-                                <OtherExpenseForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/other-expenses/edit/:id" element={
-                            <PermissionGate path="/other-expenses">
-                                <OtherExpenseForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/employees" element={
-                            <PermissionGate path="/employees">
-                                <EmployeeList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/employees/new" element={
-                            <PermissionGate path="/employees">
-                                <EmployeeForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/employees/edit/:id" element={
-                            <PermissionGate path="/employees">
-                                <EmployeeForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/infrastructure/servers" element={
-                            <PermissionGate path="/infrastructure/servers">
-                                <ServerList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/infrastructure/servers/new" element={
-                            <PermissionGate path="/infrastructure/servers">
-                                <ServerForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/infrastructure/servers/edit/:id" element={
-                            <PermissionGate path="/infrastructure/servers">
-                                <ServerForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/infrastructure/servers/:id" element={
-                            <PermissionGate path="/infrastructure/servers">
-                                <ServerDetail />
-                            </PermissionGate>
-                        } />
-                        <Route path="/infrastructure/domains" element={
-                            <PermissionGate path="/infrastructure/domains">
-                                <DomainList />
-                            </PermissionGate>
-                        } />
-                        <Route path="/infrastructure/domains/new" element={
-                            <PermissionGate path="/infrastructure/domains">
-                                <DomainForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/infrastructure/domains/edit/:id" element={
-                            <PermissionGate path="/infrastructure/domains">
-                                <DomainForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/infrastructure/domains/:id" element={
-                            <PermissionGate path="/infrastructure/domains">
-                                <DomainDetail />
-                            </PermissionGate>
-                        } />
-                        <Route path="/reports" element={
-                            <PermissionGate path="/reports">
-                                <ReportsPage />
-                            </PermissionGate>
-                        } />
-                        <Route path="/profile" element={<ProfilePage />} />
-                        <Route path="/employee-performance" element={<EmployeePerformance />} />
-                        <Route path="/team-performance" element={
-                            <PermissionGate path="/team-performance">
-                                <TeamPerformance />
-                            </PermissionGate>
-                        } />
-                        <Route path="/company-profile" element={
-                            <PermissionGate path="/company-profile">
-                                <CompanyProfilePage />
-                            </PermissionGate>
-                        } />
-                        <Route path="/company-profile/new" element={
-                            <PermissionGate path="/company-profile">
-                                <CompanyProfileForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/company-profile/edit/:id" element={
-                            <PermissionGate path="/company-profile">
-                                <CompanyProfileForm />
-                            </PermissionGate>
-                        } />
-                        <Route path="/advances/client/:clientId" element={<AdvanceList />} />
-                        <Route path="/advances/client/:clientId/new" element={<AdvanceForm />} />
-                        <Route path="/advances/client/:clientId/edit/:advanceId" element={<AdvanceForm />} />
-                        <Route path="/invoices/client/:clientId/:invoiceId/payments" element={<InvoicePaymentList />} />
-                        <Route path="/invoices/client/:clientId/:invoiceId/payments/new" element={<InvoicePaymentForm />} />
-                        <Route path="/invoices/client/:clientId/:invoiceId/payments/edit/:paymentId" element={<InvoicePaymentForm />} />
-                    </Route>
+                        {/* Protected Routes with Sidebar Layout */}
+                        <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                            <Route path="/dashboard" element={
+                                <PermissionGate permission="view_analytics">
+                                    <AnalyticalDashboard />
+                                </PermissionGate>
+                            } />
+                            <Route path="/projects/statistics/details" element={
+                                <PermissionGate permission="view_project">
+                                    <ProjectStatisticsDetail />
+                                </PermissionGate>
+                            } />
+                            <Route path="/users" element={
+                                <PermissionGate permission="view_user">
+                                    <UserList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/users/new" element={
+                                <PermissionGate permission="add_user">
+                                    <UserForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/users/edit/:id" element={
+                                <PermissionGate permission="change_user">
+                                    <UserForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/users/:id" element={
+                                <PermissionGate permission="view_user">
+                                    <UserDetail />
+                                </PermissionGate>
+                            } />
+                            <Route path="/projects" element={
+                                <PermissionGate permission="view_project">
+                                    <ProjectList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/projects/new" element={
+                                <PermissionGate permission="add_project">
+                                    <ProjectForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/projects/edit/:id" element={
+                                <PermissionGate permission="change_project">
+                                    <ProjectForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/projects/:id" element={
+                                <PermissionGate permission="view_project">
+                                    <ProjectDetail />
+                                </PermissionGate>
+                            } />
+                            <Route path="/teams" element={
+                                <PermissionGate permission="view_team">
+                                    <TeamList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/teams/new" element={
+                                <PermissionGate permission="add_team">
+                                    <TeamForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/teams/edit/:id" element={
+                                <PermissionGate permission="change_team">
+                                    <TeamForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/invoices/company-summary" element={
+                                <PermissionGate permission="view_invoice">
+                                    <InvoiceCompanyList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/invoices/new" element={
+                                <PermissionGate permission="add_invoice">
+                                    <InvoiceForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/invoices/client/:clientId" element={
+                                <PermissionGate permission="view_invoice">
+                                    <InvoiceList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/invoices/client/:clientId/new" element={
+                                <PermissionGate permission="add_invoice">
+                                    <InvoiceForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/invoices/client/:clientId/edit/:id" element={
+                                <PermissionGate permission="change_invoice">
+                                    <InvoiceForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/invoices/client/:clientId/:id" element={
+                                <PermissionGate permission="view_invoice">
+                                    <InvoiceDetail />
+                                </PermissionGate>
+                            } />
+                            <Route path="/activities" element={
+                                <PermissionGate permission={['view_all_activities', 'view_own_activities']}>
+                                    <ActivityList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/employees/:employeeId/activities" element={
+                                <PermissionGate permission={['view_all_activities', 'view_own_activities']}>
+                                    <ActivityList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/activities/new" element={
+                                <PermissionGate permission={['add_employeedailyactivity', 'view_own_activities']}>
+                                    <ActivityForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/activities/edit/:id" element={
+                                <PermissionGate permission={['change_employeedailyactivity', 'view_own_activities']}>
+                                    <ActivityForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/leaves" element={
+                                <PermissionGate permission="view_employeeleave">
+                                    <LeaveList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/leaves/new" element={
+                                <PermissionGate permission="add_employeeleave">
+                                    <LeaveForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/leaves/edit/:id" element={
+                                <PermissionGate permission="change_employeeleave">
+                                    <LeaveForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/salaries" element={
+                                <PermissionGate permission="view_salary">
+                                    <SalaryList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/salaries/new" element={
+                                <PermissionGate permission="add_salary">
+                                    <SalaryForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/salaries/edit/:id" element={
+                                <PermissionGate permission="change_salary">
+                                    <SalaryForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/user-salaries" element={
+                                <PermissionGate permission="view_usersalary">
+                                    <UserSalaryList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/user-salaries/new" element={
+                                <PermissionGate permission="add_usersalary">
+                                    <UserSalaryForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/user-salaries/edit/:id" element={
+                                <PermissionGate permission="change_usersalary">
+                                    <UserSalaryForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/attendance" element={
+                                <PermissionGate permission="view_attendance">
+                                    <AttendanceList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/attendance/new" element={
+                                <PermissionGate permission="add_attendance">
+                                    <AttendanceForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/attendance/edit/:id" element={
+                                <PermissionGate permission="change_attendance">
+                                    <AttendanceForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/other-incomes" element={
+                                <PermissionGate permission="view_otherincome">
+                                    <OtherIncomeList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/other-incomes/new" element={
+                                <PermissionGate permission="add_otherincome">
+                                    <OtherIncomeForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/other-incomes/edit/:id" element={
+                                <PermissionGate permission="change_otherincome">
+                                    <OtherIncomeForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/other-expenses" element={
+                                <PermissionGate permission="view_otherexpense">
+                                    <OtherExpenseList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/other-expenses/new" element={
+                                <PermissionGate permission="add_otherexpense">
+                                    <OtherExpenseForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/other-expenses/edit/:id" element={
+                                <PermissionGate permission="change_otherexpense">
+                                    <OtherExpenseForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/employees" element={
+                                <PermissionGate permission="view_employee">
+                                    <EmployeeList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/employees/new" element={
+                                <PermissionGate permission="add_employee">
+                                    <EmployeeForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/employees/edit/:id" element={
+                                <PermissionGate permission="change_employee">
+                                    <EmployeeForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/servers" element={
+                                <PermissionGate permission="view_projectserver">
+                                    <ServerList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/servers/new" element={
+                                <PermissionGate permission="add_projectserver">
+                                    <ServerForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/servers/edit/:id" element={
+                                <PermissionGate permission="change_projectserver">
+                                    <ServerForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/servers/:id" element={
+                                <PermissionGate permission="view_projectserver">
+                                    <ServerDetail />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/domains" element={
+                                <PermissionGate permission="view_projectdomain">
+                                    <DomainList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/domains/new" element={
+                                <PermissionGate permission="add_projectdomain">
+                                    <DomainForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/domains/edit/:id" element={
+                                <PermissionGate permission="change_projectdomain">
+                                    <DomainForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/domains/:id" element={
+                                <PermissionGate permission="view_projectdomain">
+                                    <DomainDetail />
+                                </PermissionGate>
+                            } />
+                            <Route path="/reports" element={
+                                <PermissionGate permission="view_reports">
+                                    <ReportsPage />
+                                </PermissionGate>
+                            } />
+                            <Route path="/profile" element={<ProfilePage />} />
+                            <Route path="/employee-performance" element={
+                                <PermissionGate permission={['view_all_employee_performance', 'view_own_employee_performance']}>
+                                    <EmployeePerformance />
+                                </PermissionGate>
+                            } />
+                            <Route path="/team-performance" element={
+                                <PermissionGate permission={['view_teamperformance', 'view_all_team_performance', 'view_own_team_performance']}>
+                                    <TeamPerformance />
+                                </PermissionGate>
+                            } />
+                            <Route path="/company-profile" element={
+                                <PermissionGate permission="view_companyprofile">
+                                    <CompanyProfilePage />
+                                </PermissionGate>
+                            } />
+                            <Route path="/company-profile/new" element={
+                                <PermissionGate permission="add_companyprofile">
+                                    <CompanyProfileForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/company-profile/edit/:id" element={
+                                <PermissionGate permission="change_companyprofile">
+                                    <CompanyProfileForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/advances/client/:clientId" element={<AdvanceList />} />
+                            <Route path="/advances/client/:clientId/new" element={<AdvanceForm />} />
+                            <Route path="/advances/client/:clientId/edit/:advanceId" element={<AdvanceForm />} />
+                            <Route path="/invoices/client/:clientId/:invoiceId/payments" element={<InvoicePaymentList />} />
+                            <Route path="/invoices/client/:clientId/:invoiceId/payments/new" element={<InvoicePaymentForm />} />
+                            <Route path="/invoices/client/:clientId/:invoiceId/payments/edit/:paymentId" element={<InvoicePaymentForm />} />
+                            <Route path="/roles" element={
+                                <PermissionGate permission="view_role">
+                                    <RoleManagement />
+                                </PermissionGate>
+                            } />
+                        </Route>
 
-                    <Route path="/" element={<Navigate to="/login" replace />} />
-                    <Route path="*" element={<Navigate to="/login" replace />} />
-                </Routes>
-            </BrowserRouter>
-        </ThemeProvider>
-    </ErrorBoundary>
-);
+                        <Route path="/" element={<Navigate to="/login" replace />} />
+                        <Route path="*" element={<Navigate to="/login" replace />} />
+                    </Routes>
+                </BrowserRouter>
+            </ThemeProvider>
+        </ErrorBoundary>
+    );
 }
 
 export default App;

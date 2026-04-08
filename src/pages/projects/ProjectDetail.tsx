@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getProject, deleteProject, type Project } from './projectService';
+import { usePermission } from '../../hooks/usePermission';
 import {
     ArrowLeft,
     Calendar,
@@ -27,6 +28,7 @@ import {
 const ProjectDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { hasPermission } = usePermission();
     const [project, setProject] = useState<Project | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -110,18 +112,22 @@ const ProjectDetail: React.FC = () => {
                     <span>Back to Projects</span>
                 </button>
                 <div className="flex items-center space-x-3">
-                    <button onClick={handleDelete} className="flex items-center space-x-2 px-4 py-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 rounded-xl transition-all font-semibold border border-rose-500/20">
-                        <Trash2 size={18} />
-                        <span>Delete</span>
-                    </button>
+                    {hasPermission('delete_project') && (
+                        <button onClick={handleDelete} className="flex items-center space-x-2 px-4 py-2 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 rounded-xl transition-all font-semibold border border-rose-500/20">
+                            <Trash2 size={18} />
+                            <span>Delete</span>
+                        </button>
+                    )}
                     <button onClick={() => navigate(`/activities/new?project=${project.id}`)} className="flex items-center space-x-2 px-4 py-2 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-xl transition-all font-semibold border border-emerald-500/20">
                         <ClipboardList size={18} />
                         <span>Add Activity</span>
                     </button>
-                    <button onClick={() => navigate(`/projects/edit/${project.id}`)} className="flex items-center space-x-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl transition-all font-semibold border border-primary/20">
-                        <Edit2 size={18} />
-                        <span>Edit Project</span>
-                    </button>
+                    {hasPermission('change_project') && (
+                        <button onClick={() => navigate(`/projects/edit/${project.id}`)} className="flex items-center space-x-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl transition-all font-semibold border border-primary/20">
+                            <Edit2 size={18} />
+                            <span>Edit Project</span>
+                        </button>
+                    )}
                 </div>
             </div>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getLeaves, deleteLeave, type EmployeeLeave } from './leaveService';
 import { getUsers } from '../user/userService';
+import { usePermission } from '../../hooks/usePermission';
 import {
     Search,
     Plus,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 
 const LeaveList: React.FC = () => {
+    const { hasPermission } = usePermission();
     const [leaves, setLeaves] = useState<EmployeeLeave[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -115,10 +117,12 @@ const LeaveList: React.FC = () => {
                     <h1 className="text-4xl font-black tracking-tighter text-foreground bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Employee Leaves</h1>
                     <p className="text-muted font-bold text-sm uppercase tracking-widest mt-1">Leave Management & Tracking</p>
                 </div>
-                <button onClick={() => navigate('/leaves/new')} className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02] active:scale-95">
-                    <Plus size={20} strokeWidth={3} />
-                    <span>Request Leave</span>
-                </button>
+                {hasPermission('add_employeeleave') && (
+                    <button onClick={() => navigate('/leaves/new')} className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02] active:scale-95">
+                        <Plus size={20} strokeWidth={3} />
+                        <span>Request Leave</span>
+                    </button>
+                )}
             </div>
 
             {/* Summary Cards */}
@@ -210,8 +214,12 @@ const LeaveList: React.FC = () => {
                                     </td>
                                     <td className="px-8 py-6 text-right">
                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                                            <button onClick={() => navigate(`/leaves/edit/${leave.id}`)} className="p-2 hover:bg-primary/10 text-primary rounded-xl transition-colors border border-transparent hover:border-primary/20"><Edit2 size={16} /></button>
-                                            <button onClick={() => handleDelete(leave.id)} className="p-2 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors border border-transparent hover:border-rose-500/20"><Trash2 size={16} /></button>
+                                            {hasPermission('change_employeeleave') && (
+                                                <button onClick={() => navigate(`/leaves/edit/${leave.id}`)} className="p-2 hover:bg-primary/10 text-primary rounded-xl transition-colors border border-transparent hover:border-primary/20"><Edit2 size={16} /></button>
+                                            )}
+                                            {hasPermission('delete_employeeleave') && (
+                                                <button onClick={() => handleDelete(leave.id)} className="p-2 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors border border-transparent hover:border-rose-500/20"><Trash2 size={16} /></button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -225,6 +233,14 @@ const LeaveList: React.FC = () => {
                         <div className="inline-flex p-6 bg-muted/20 rounded-[2rem] text-muted mb-4"><Calendar size={48} /></div>
                         <h3 className="text-lg font-bold text-foreground">No leave requests found</h3>
                         <p className="text-muted text-sm max-w-xs mx-auto">Try adjusting your search term or request a new leave.</p>
+                        {hasPermission('add_employeeleave') && (
+                            <button 
+                                onClick={() => navigate('/leaves/new')} 
+                                className="mt-6 px-6 py-2.5 bg-primary text-white font-black rounded-2xl shadow-lg shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all"
+                            >
+                                Request Leave
+                            </button>
+                        )}
                     </div>
                 )}
 

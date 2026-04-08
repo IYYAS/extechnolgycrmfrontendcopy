@@ -1,48 +1,62 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { ROLES_PERMISSIONS } from '../pages/login/auth';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { usePermission } from '../hooks/usePermission';
+import { ShieldAlert, ArrowLeft, MessageSquare } from 'lucide-react';
 
 interface PermissionGateProps {
     children: React.ReactNode;
-    path: string;
+    permission?: string | string[]; // Required permission codename(s)
 }
 
-const PermissionGate: React.FC<PermissionGateProps> = ({ children, path }) => {
-    const location = useLocation();
-    const activeRole = localStorage.getItem('active_role');
-    const storedUser = localStorage.getItem('user');
+const PermissionGate: React.FC<PermissionGateProps> = ({ children, permission }) => {
+    const navigate = useNavigate();
+    const { hasPermission } = usePermission();
     
-    let userRoles: string[] = [];
-    let isSuperAdmin = false;
-    
-    try {
-        if (storedUser) {
-            const user = JSON.parse(storedUser);
-            userRoles = (user.roles || []).map((r: any) => ((r.name || r) as string).toUpperCase());
-            isSuperAdmin = user.is_superuser || userRoles.includes('SUPERADMIN');
-        }
-    } catch (e) {
-        console.error('PermissionGate: Error parsing user', e);
-    }
+    // If no permission specified, allow access
+    if (!permission) return <>{children}</>;
 
-    // SuperAdmin always has access if no active role is set, 
-    // or if they are in a view they have permission for.
-    if (isSuperAdmin && !activeRole) return <>{children}</>;
+    if (!hasPermission(permission)) {
+        return (
+            <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-500">
+                <div className="relative mb-8">
+                    <div className="absolute inset-0 bg-rose-500/20 blur-3xl rounded-full animate-pulse"></div>
+                    <div className="relative w-24 h-24 rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 shadow-inner">
+                        <ShieldAlert size={48} />
+                    </div>
+                </div>
 
-    const effectiveRoles = activeRole ? [activeRole.toUpperCase()] : userRoles;
-    
-    const hasPermission = effectiveRoles.some(role => {
-        const permissions = ROLES_PERMISSIONS[role] || [];
-        return permissions.includes('*') || permissions.includes(path);
-    });
+                <div className="max-w-md space-y-4">
+                    <h1 className="text-3xl font-black tracking-tight text-foreground italic uppercase">Access Restricted</h1>
+                    <p className="text-muted font-medium leading-relaxed">
+                        This role has no permission to access this module. 
+                        Please contact your <span className="text-primary font-bold">Super Admin</span> to request access.
+                    </p>
+                </div>
 
-    if (!hasPermission) {
-        // Redirect to a safe page they HAVE permission for, or profile as fallback
-        const permissions = ROLES_PERMISSIONS[effectiveRoles[0]] || [];
-        const fallbackPath = permissions.length > 0 && permissions[0] !== '*' ? permissions[0] : '/profile';
-        
-        console.warn(`Access denied for path ${path}. Redirecting to ${fallbackPath}`);
-        return <Navigate to={fallbackPath} replace state={{ from: location }} />;
+                <div className="flex flex-col sm:flex-row items-center gap-4 mt-10">
+                    <button
+                        onClick={() => navigate(-1)}
+                        className="flex items-center gap-2 px-6 py-3 bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 rounded-2xl text-foreground font-bold transition-all hover:-translate-x-1"
+                    >
+                        <ArrowLeft size={18} />
+                        Go Back
+                    </button>
+                    <button
+                        disabled
+                        className="flex items-center gap-2 px-6 py-3 bg-primary/10 text-primary border border-primary/20 rounded-2xl font-bold opacity-60 cursor-not-allowed"
+                    >
+                        <MessageSquare size={18} />
+                        Report to Admin
+                    </button>
+                </div>
+                
+                <div className="mt-12 pt-8 border-t border-border w-full max-w-xs opacity-50">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted">
+                        RBAC Security Protocol v2.0
+                    </p>
+                </div>
+            </div>
+        );
     }
 
     return <>{children}</>;

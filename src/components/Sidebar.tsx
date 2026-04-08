@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTheme, type AccentColor } from '../context/ThemeContext';
-import { ROLES_PERMISSIONS } from '../pages/login/auth';
+import { usePermission } from '../hooks/usePermission';
 
 interface SidebarProps {
     collapsed: boolean;
@@ -60,22 +60,8 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
 
 
 
-    const userRoles: string[] = (user?.roles || []).map((r: any) => ((r.name || r) as string).toUpperCase());
-    const isSuperAdmin = userRoles.includes('SUPERADMIN') || user?.is_superuser;
-
-    // For SuperAdmin, check if a specific view is selected, otherwise use full access
-    const activeRole = localStorage.getItem('active_role');
-
-    const canView = (path: string) => {
-        if (isSuperAdmin && !activeRole) return true;
-
-        const effectiveRoles: string[] = activeRole ? [activeRole.toUpperCase()] : userRoles;
-
-        return effectiveRoles.some((role: string) => {
-            const permissions = ROLES_PERMISSIONS[role] || [];
-            return permissions.includes('*') || permissions.includes(path);
-        });
-    };
+    const { hasPermission } = usePermission();
+    const canView = (permission: string | string[]) => hasPermission(permission);
 
     const menuItemStyles = {
         button: ({ active }: { active: boolean }) => ({
@@ -157,16 +143,16 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                 {/* Content */}
                 <div className="flex-1 py-4">
                     <Menu menuItemStyles={menuItemStyles}>
-                        {canView('/dashboard') && (
+                        {canView('view_analytics') && (
                             <MenuItem
                                 icon={<LayoutDashboard size={20} />}
                                 component={<Link to="/dashboard" />}
                                 active={isActive('/dashboard')}
                             >
-                                Dashboard
+                                Analytics
                             </MenuItem>
                         )}
-                        {canView('/reports') && (
+                        {canView('view_reports') && (
                             <MenuItem
                                 icon={<BarChart3 size={20} />}
                                 component={<Link to="/reports" />}
@@ -175,7 +161,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Reports
                             </MenuItem>
                         )}
-                        {canView('/users') && (
+                        {canView('view_user') && (
                             <MenuItem
                                 icon={<Users size={20} />}
                                 component={<Link to="/users" />}
@@ -184,7 +170,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Users
                             </MenuItem>
                         )}
-                        {canView('/employees') && (
+                        {canView('view_employee') && (
                             <MenuItem
                                 icon={<UserCheck size={20} />}
                                 component={<Link to="/employees" />}
@@ -193,7 +179,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Employees
                             </MenuItem>
                         )}
-                        {canView('/teams') && (
+                        {canView('view_team') && (
                             <MenuItem
                                 icon={<Layers size={20} />}
                                 component={<Link to="/teams" />}
@@ -202,7 +188,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Teams
                             </MenuItem>
                         )}
-                        {canView('/projects') && (
+                        {canView('view_project') && (
                             <MenuItem
                                 icon={<Briefcase size={20} />}
                                 component={<Link to="/projects" />}
@@ -211,7 +197,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Projects
                             </MenuItem>
                         )}
-                        {canView('/infrastructure/servers') && (
+                        {canView('view_projectserver') && (
                             <MenuItem
                                 icon={<Server size={20} />}
                                 component={<Link to="/infrastructure/servers" />}
@@ -220,7 +206,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Servers
                             </MenuItem>
                         )}
-                        {canView('/infrastructure/domains') && (
+                        {canView('view_projectdomain') && (
                             <MenuItem
                                 icon={<Globe size={20} />}
                                 component={<Link to="/infrastructure/domains" />}
@@ -230,7 +216,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                             </MenuItem>
                         )}
 
-                        {canView('/invoices/company-summary') && (
+                        {canView('view_invoice') && (
                             <MenuItem
                                 icon={<FileText size={20} />}
                                 component={<Link to="/invoices/company-summary" />}
@@ -239,7 +225,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Invoices
                             </MenuItem>
                         )}
-                        {canView('/other-incomes') && (
+                        {canView('view_otherincome') && (
                             <MenuItem
                                 icon={<DollarSign size={20} />}
                                 component={<Link to="/other-incomes" />}
@@ -248,7 +234,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Other Incomes
                             </MenuItem>
                         )}
-                        {canView('/other-expenses') && (
+                        {canView('view_otherexpense') && (
                             <MenuItem
                                 icon={<Receipt size={20} />}
                                 component={<Link to="/other-expenses" />}
@@ -257,7 +243,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Other Expenses
                             </MenuItem>
                         )}
-                        {canView('/activities') && (
+                        {canView(['view_all_activities', 'view_own_activities']) && (
                             <MenuItem
                                 icon={<Clock size={20} />}
                                 component={<Link to="/activities" />}
@@ -266,7 +252,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Activities
                             </MenuItem>
                         )}
-                        {canView('/attendance') && (
+                        {canView('view_attendance') && (
                             <MenuItem
                                 icon={<CalendarCheck size={20} />}
                                 component={<Link to="/attendance" />}
@@ -275,7 +261,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Attendance
                             </MenuItem>
                         )}
-                        {canView('/leaves') && (
+                        {canView('view_employeeleave') && (
                             <MenuItem
                                 icon={<ClipboardList size={20} />}
                                 component={<Link to="/leaves" />}
@@ -284,7 +270,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Leaves
                             </MenuItem>
                         )}
-                        {canView('/salaries') && (
+                        {canView('view_salary') && (
                             <MenuItem
                                 icon={<Wallet size={20} />}
                                 component={<Link to="/salaries" />}
@@ -293,7 +279,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Salaries
                             </MenuItem>
                         )}
-                        {canView('/user-salaries') && (
+                        {canView('view_usersalary') && (
                             <MenuItem
                                 icon={<UserCog size={20} />}
                                 component={<Link to="/user-salaries" />}
@@ -302,7 +288,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Set Salaries
                             </MenuItem>
                         )}
-                        {canView('/employee-performance') && (
+                        {canView(['view_all_employee_performance', 'view_own_employee_performance']) && (
                             <MenuItem
                                 icon={<BarChart3 size={20} />}
                                 component={<Link to="/employee-performance" />}
@@ -311,7 +297,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Employee Performance
                             </MenuItem>
                         )}
-                        {canView('/team-performance') && (
+                        {canView(['view_teamperformance', 'view_all_team_performance', 'view_own_team_performance']) && (
                             <MenuItem
                                 icon={<BarChart3 size={20} />}
                                 component={<Link to="/team-performance" />}
@@ -320,22 +306,29 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Team Performance
                             </MenuItem>
                         )}
-                        {canView('/profile') && (
-                            <MenuItem
-                                icon={<UserCircle size={20} />}
-                                component={<Link to="/profile" />}
-                                active={isActive('/profile')}
-                            >
-                                Profile
-                            </MenuItem>
-                        )}
-                        {canView('/company-profile') && (
+                        <MenuItem
+                            icon={<UserCircle size={20} />}
+                            component={<Link to="/profile" />}
+                            active={isActive('/profile')}
+                        >
+                            Profile
+                        </MenuItem>
+                        {canView('view_companyprofile') && (
                             <MenuItem
                                 icon={<Building2 size={20} />}
                                 component={<Link to="/company-profile" />}
                                 active={isActive('/company-profile')}
                             >
                                 Company
+                            </MenuItem>
+                        )}
+                        {canView('view_role') && (
+                            <MenuItem
+                                icon={<UserCog size={20} />}
+                                component={<Link to="/roles" />}
+                                active={isActive('/roles')}
+                            >
+                                Role Management
                             </MenuItem>
                         )}
                     </Menu>

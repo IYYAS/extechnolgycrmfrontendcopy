@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Users, 
-    Briefcase, 
-    CheckCircle2, 
-    TrendingUp, 
+import {
+    Users,
+    Briefcase,
+    CheckCircle2,
+    TrendingUp,
     Loader2,
     Clock,
     Search,
@@ -25,11 +25,11 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
     const s = (status || '').toLowerCase();
     let bg = 'bg-muted/30';
     let text = 'text-muted';
-    
+
     if (s.includes('completed')) { bg = 'bg-emerald-500/10'; text = 'text-emerald-500'; }
     else if (s.includes('progress') || s.includes('active')) { bg = 'bg-indigo-500/10'; text = 'text-indigo-500'; }
     else if (s.includes('pending')) { bg = 'bg-amber-500/10'; text = 'text-amber-500'; }
-    
+
     return (
         <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${bg} ${text}`}>
             {status}
@@ -40,8 +40,8 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 // ── Single‑team panel (List-based Assignment Oversight) ──
 const SingleTeamPanel: React.FC<{ data: TeamPerformanceData; showTitle?: boolean }> = ({ data, showTitle = true }) => {
     const [searchTerm, setSearchTerm] = useState('');
-    
-    const filteredMembers = (data.member_names || []).filter(name => 
+
+    const filteredMembers = (data.member_names || []).filter(name =>
         name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -352,7 +352,7 @@ const TeamPerformance: React.FC = () => {
                         <TeamCard key={team.team_id} data={team} rank={i + 1} />
                     ))}
                 </motion.div>
-                
+
                 {(!rawData.teams || rawData.teams.length === 0) && (
                     <div className="text-center py-20 bg-muted/5 border border-dashed border-border rounded-[3rem]">
                         <Users className="mx-auto text-muted/20 mb-4" size={64} />

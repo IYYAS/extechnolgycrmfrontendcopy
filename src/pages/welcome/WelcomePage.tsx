@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, ArrowRight } from 'lucide-react';
-import { ROLES_PERMISSIONS } from '../login/auth';
+import { usePermission } from '../../hooks/usePermission';
 
 const WelcomePage: React.FC = () => {
     const navigate = useNavigate();
@@ -21,24 +21,45 @@ const WelcomePage: React.FC = () => {
     }
 
 
-
+    const { hasPermission } = usePermission();
 
     const handleRoleClick = (roleName: string) => {
         const roleKey = roleName.toUpperCase();
         localStorage.setItem('active_role', roleKey);
         
-        // Find first allowed path
-        const permissions = ROLES_PERMISSIONS[roleKey] || [];
-        if (permissions.includes('*')) {
+        // Smart Redirect: Find the best landing page the user actually has access to
+        if (hasPermission('view_project')) {
             navigate('/dashboard');
-        } else if (permissions.length > 0) {
-            navigate(permissions[0]);
+        } else if (hasPermission('view_user')) {
+            navigate('/users');
+        } else if (hasPermission('view_employee')) {
+            navigate('/employees');
+        } else if (hasPermission('view_team')) {
+            navigate('/teams');
         } else {
-            navigate('/profile'); // Fallback
+            // Default fallback if they have restricted access
+            navigate('/profile');
         }
     };
 
-    const allItems = (user.roles || []).map((r: any) => ({ label: r.name || r, isDesignation: false }));
+    const allItems = (() => {
+        const items = (user.roles || []).map((r: any) => ({
+            label: typeof r === 'string' ? r : (r.name || r.label || 'Unknown Role'),
+            isDesignation: false
+        }));
+
+        // Fallback for single role
+        if (items.length === 0 && user.role) {
+            items.push({ label: user.role, isDesignation: false });
+        }
+
+        // Emergency SuperAdmin access if no roles assigned
+        if (items.length === 0 && user.is_superuser) {
+            items.push({ label: 'SUPERADMIN (SYSTEM)', isDesignation: false });
+        }
+
+        return items;
+    })();
 
     return (
         <div className="min-h-screen bg-background text-foreground relative overflow-hidden flex flex-col items-center justify-center p-6 sm:p-12">

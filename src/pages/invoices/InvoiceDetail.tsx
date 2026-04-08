@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getInvoice, deleteInvoice, getInvoicePdf, type Invoice, type ClientCompany, type CompanyProfile } from './invoiceService';
+import { usePermission } from '../../hooks/usePermission';
 import {
     ArrowLeft, Calendar, FileText, CreditCard, Edit2, Loader2, Trash2,
     Receipt, User, Clock, CheckCircle2, AlertCircle, Download,
@@ -43,6 +44,7 @@ const InvoiceDetail: React.FC = () => {
     const { clientId: clientIdParam, id } = useParams<{ clientId: string; id: string }>();
     const clientId = clientIdParam ? parseInt(clientIdParam) : undefined;
     const navigate = useNavigate();
+    const { hasPermission } = usePermission();
 
     const [invoice, setInvoice] = useState<ExtendedInvoice | null>(null);
     const [loading, setLoading] = useState(true);
@@ -161,15 +163,19 @@ const InvoiceDetail: React.FC = () => {
                     <button onClick={handleDownloadPdf} className="flex items-center gap-2 px-4 py-2.5 bg-card border border-border rounded-2xl font-bold text-muted hover:text-foreground hover:border-primary/30 transition-all text-sm">
                         <Download size={16} /> Download PDF
                     </button>
-                    <button onClick={handleDelete} className="p-2.5 text-rose-500 hover:bg-rose-500/10 rounded-2xl border border-rose-500/10 transition-all">
-                        <Trash2 size={18} />
-                    </button>
-                    <button
-                        onClick={() => navigate(`/invoices/client/${clientId}/edit/${invoice.id}`)}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-2xl font-bold hover:scale-[1.02] transition-all shadow-lg shadow-primary/20"
-                    >
-                        <Edit2 size={16} /> Edit Invoice
-                    </button>
+                    {hasPermission('delete_invoice') && (
+                        <button onClick={handleDelete} className="p-2.5 text-rose-500 hover:bg-rose-500/10 rounded-2xl border border-rose-500/10 transition-all">
+                            <Trash2 size={18} />
+                        </button>
+                    )}
+                    {hasPermission('change_invoice') && (
+                        <button
+                            onClick={() => navigate(`/invoices/client/${clientId}/edit/${invoice.id}`)}
+                            className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-2xl font-bold hover:scale-[1.02] transition-all shadow-lg shadow-primary/20"
+                        >
+                            <Edit2 size={16} /> Edit Invoice
+                        </button>
+                    )}
                 </div>
             </div>
 

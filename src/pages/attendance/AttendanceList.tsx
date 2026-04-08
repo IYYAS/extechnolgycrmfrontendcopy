@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAttendances, deleteAttendance, type Attendance } from './attendanceService';
+import { usePermission } from '../../hooks/usePermission';
 import { getUsers } from '../user/userService';
 import {
     Search, Plus, Loader2, Edit2, Trash2, AlertCircle,
@@ -16,6 +17,7 @@ const AttendanceList: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [users, setUsers] = useState<any[]>([]);
     const navigate = useNavigate();
+    const { hasPermission } = usePermission();
 
     const ITEMS_PER_PAGE = 10;
     const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
@@ -85,10 +87,12 @@ const AttendanceList: React.FC = () => {
                     <h1 className="text-4xl font-black tracking-tighter bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Attendance</h1>
                     <p className="text-muted font-bold text-sm uppercase tracking-widest mt-1">Employee Attendance Tracker</p>
                 </div>
-                <button onClick={() => navigate('/attendance/new')} className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02] active:scale-95">
-                    <Plus size={20} strokeWidth={3} />
-                    <span>Mark Attendance</span>
-                </button>
+                 {hasPermission('add_attendance') && (
+                    <button onClick={() => navigate('/attendance/new')} className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02] active:scale-95">
+                        <Plus size={20} strokeWidth={3} />
+                        <span>Mark Attendance</span>
+                    </button>
+                )}
             </div>
 
             {/* Summary Cards */}
@@ -173,9 +177,13 @@ const AttendanceList: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-8 py-6 text-right">
-                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                                            <button onClick={() => navigate(`/attendance/edit/${rec.id}`)} className="p-2 hover:bg-primary/10 text-primary rounded-xl transition-colors border border-transparent hover:border-primary/20"><Edit2 size={16} /></button>
-                                            <button onClick={() => handleDelete(rec.id)} className="p-2 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors border border-transparent hover:border-rose-500/20"><Trash2 size={16} /></button>
+                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                                            {hasPermission('change_attendance') && (
+                                                <button onClick={() => navigate(`/attendance/edit/${rec.id}`)} className="p-2 hover:bg-primary/10 text-primary rounded-xl transition-colors border border-transparent hover:border-primary/20"><Edit2 size={16} /></button>
+                                            )}
+                                            {hasPermission('delete_attendance') && (
+                                                <button onClick={() => handleDelete(rec.id)} className="p-2 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors border border-transparent hover:border-rose-500/20"><Trash2 size={16} /></button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

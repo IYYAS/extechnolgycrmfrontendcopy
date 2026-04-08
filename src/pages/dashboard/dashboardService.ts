@@ -205,6 +205,7 @@ export interface ExpiringSoonServer {
     server_type: string;
     expiration_date: string;
     project: string | null;
+    days_until_expiry?: number;
 }
 
 export interface DomainOverview {
@@ -225,13 +226,49 @@ export interface ExpiringSoonDomain {
     id: number;
     domain: string;
     expiration_date: string;
+    purchase_date?: string;
     project: string | null;
+    purchased_from?: string;
+    days_until_expiry?: number | null;
+}
+
+export interface DomainListDomain {
+    id: number;
+    name: string;
+    domain: string;
+    expiration_date: string;
+    purchase_date?: string;
+    project: string | null;
+    payment_status: string;
+    status: string;
+    effective_status?: string;
+    cost: number;
+    accrued_by?: string;
+    purchased_from?: string;
+    days_until_expiry?: number | null;
 }
 
 export interface DomainAnalyticsResponse {
     overview: DomainOverview;
     by_accrued_by: DomainByAccruedBy[];
     expiring_soon: ExpiringSoonDomain[];
+    domains_list?: DomainListDomain[];
+}
+
+export interface ServerListServer {
+    id: number;
+    name: string;
+    server_type: string;
+    expiration_date: string;
+    purchase_date?: string;
+    project: string | null;
+    payment_status: string;
+    status: string;
+    effective_status?: string;
+    cost: number;
+    accrued_by?: string;
+    purchased_from?: string;
+    days_until_expiry?: number;
 }
 
 export interface ServerAnalyticsResponse {
@@ -239,6 +276,7 @@ export interface ServerAnalyticsResponse {
     by_server_type: ServerByType[];
     by_accrued_by: ServerByAccruedBy[];
     expiring_soon: ExpiringSoonServer[];
+    servers_list?: ServerListServer[];
 }
 
 export interface AnalyticalProjectsResponse {

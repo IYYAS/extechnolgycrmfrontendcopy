@@ -27,13 +27,13 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
     const [roleLoading, setRoleLoading] = useState(false);
     const isEdit = !!id || !!initialUser;
     const loggedInUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const isSuperAdmin = loggedInUser.roles?.some((role: any) =>
+    const isSuperAdmin = loggedInUser.is_superuser || loggedInUser.roles?.some((role: any) =>
         typeof role === 'string' ? role === 'SuperAdmin' : role.name === 'SuperAdmin'
     );
 
     const { register, handleSubmit, setValue, watch, reset } = useForm<any>({
         defaultValues: {
-            roles: []
+            role_id: null
         }
     });
 
@@ -51,7 +51,7 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                         last_name: data.last_name,
                         phone_number: data.phone_number || '',
                         designation: data.designation || '',
-                        roles: (data.roles || []).map((r: any) => r.id)
+                        role_id: data.role?.id || null
                     } as any);
                 } catch (error) {
                     console.error('Failed to fetch user for editing:', error);
@@ -69,12 +69,12 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                 last_name: initialUser.last_name,
                 phone_number: initialUser.phone_number || '',
                 designation: initialUser.designation || '',
-                roles: (initialUser.roles || []).map((r: any) => r.id)
+                role_id: initialUser.role?.id || null
             } as any);
         }
     }, [id, initialUser, reset, navigate]);
     const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
-    const selectedRoles = (watch('roles') || []) as number[];
+    const selectedRoleId = watch('role_id');
 
     useEffect(() => {
         const fetchRoles = async () => {
@@ -83,7 +83,6 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                 setAvailableRoles(data);
             } catch (err) {
                 console.error('Failed to fetch roles:', err);
-                // Fallback to some defaults if API fails, but ideally API should work
                 setAvailableRoles([
                     { id: 1, name: 'SuperAdmin' },
                     { id: 2, name: 'Admin' },
@@ -97,19 +96,12 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
 
     const onSubmit = async (data: any) => {
         setLoading(true);
-        // Rename 'roles' to 'role_ids' as required by the backend
-        const payload = {
-            ...data,
-            role_ids: data.roles
-        };
-        delete payload.roles;
-
         setError(null);
         try {
             if (isEdit && user) {
-                await updateUser(user.id, payload);
+                await updateUser(user.id, data);
             } else {
-                await createUser({ ...payload, password: 'defaultPassword123' });
+                await createUser({ ...data, password: 'defaultPassword123' });
             }
             if (onSuccess) onSuccess();
             navigate('/users');
@@ -117,16 +109,13 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
             console.error('Failed to save user:', error);
 
             let message = 'An unexpected error occurred.';
-
             if (error.response) {
-                // The server responded with a status code that falls out of the range of 2xx
                 const serverError = error.response.data;
                 if (typeof serverError === 'string' && !serverError.includes('<!DOCTYPE html>')) {
                     message = serverError;
                 } else if (serverError.detail) {
                     message = serverError.detail;
                 } else if (typeof serverError === 'object') {
-                    // Handle DRF field errors: { "username": ["This field is required."] }
                     const errors = Object.entries(serverError).map(([field, msgs]) => {
                         const label = field.charAt(0).toUpperCase() + field.slice(1);
                         const cleanMsgs = Array.isArray(msgs) ? msgs.join(' ') : msgs;
@@ -135,24 +124,13 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                     if (errors.length > 0) {
                         message = errors.join(' | ');
                     }
-                } else if (error.response.status === 500) {
-                    message = 'Server Error (500): The server encountered an error.';
                 }
-            } else if (error.request) {
-                // The request was made but no response was received
-                message = 'Network error: No response from server. Please check your connection.';
-            } else {
-                // Something happened in setting up the request that triggered an Error
-                message = error.message;
             }
-
             setError(message);
         } finally {
             setLoading(false);
         }
     };
-
-
 
     const handleAddRole = async () => {
         if (!newRoleName.trim()) return;
@@ -160,12 +138,7 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
         try {
             const createdRole = await createRole(newRoleName.trim());
             setAvailableRoles(prev => [...prev, createdRole]);
-            // Automatically select the newly created role
-            const current = [...selectedRoles];
-            if (!current.includes(createdRole.id)) {
-                current.push(createdRole.id);
-                setValue('roles', current);
-            }
+            setValue('role_id', createdRole.id);
             setNewRoleName('');
         } catch (err) {
             console.error('Failed to create role:', err);
@@ -176,14 +149,7 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
     };
 
     const toggleRole = (roleId: number) => {
-        const current = [...selectedRoles];
-        const index = current.indexOf(roleId);
-        if (index > -1) {
-            current.splice(index, 1);
-        } else {
-            current.push(roleId);
-        }
-        setValue('roles', current);
+        setValue('role_id', selectedRoleId === roleId ? null : roleId);
     };
 
     const handleAdminPasswordChange = async () => {
@@ -318,7 +284,7 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                                             key={role.id}
                                             type="button"
                                             onClick={() => toggleRole(role.id)}
-                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedRoles.includes(role.id)
+                                            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${selectedRoleId === role.id
                                                 ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-105'
                                                 : 'bg-muted/5 text-muted hover:bg-muted/10 border border-border'
                                                 }`}

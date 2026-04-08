@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
-    ArrowRight, Banknote, BellRing, Briefcase, CheckCircle2,
-    Circle, Clock, Globe, Layout, LayoutDashboard, LayoutGrid, Server, ShieldCheck,
-    Users, Wallet, X, Zap
+    ArrowRight, Banknote, Briefcase, CheckCircle2,
+    Circle, Clock, Globe, Layout, LayoutDashboard, LayoutGrid, Server,
+    Users, X, Zap
 } from 'lucide-react';
 import { getAnalyticalProjects, getServerAnalytics, getDomainAnalytics } from './dashboardService';
 import type { AnalyticalProjectsResponse, AnalyticalFilter, ServerAnalyticsResponse, DomainAnalyticsResponse } from './dashboardService';
@@ -20,6 +20,9 @@ import {
     Legend,
 } from 'chart.js';
 import { Doughnut } from 'react-chartjs-2';
+import ServerAnalytical from './ServerAnalytical';
+import DomainAnalytical from './DomainAnalytical';
+import { usePermission } from '../../hooks/usePermission';
 
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
@@ -148,7 +151,15 @@ const AnalyticalDashboard: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedProject, setSelectedProject] = useState<any>(null);
     const [filter, setFilter] = useState<AnalyticalFilter>({ page: 1, page_size: 10, filter_type: 'this_year' });
-    const [activeTab, setActiveTab] = useState<'projects' | 'servers' | 'domains'>('projects');
+    const { hasPermission } = usePermission();
+
+    const availableTabs = [
+        { id: 'projects', label: 'Projects', permission: 'view_projectstats' },
+        { id: 'servers', label: 'Servers', permission: 'view_server_stats' },
+        { id: 'domains', label: 'Domains', permission: 'view_domain_stats' },
+    ].filter(tab => hasPermission(tab.permission));
+
+    const [activeTab, setActiveTab] = useState<'projects' | 'servers' | 'domains' | string>(availableTabs[0]?.id || 'projects');
     const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
 
@@ -211,13 +222,13 @@ const AnalyticalDashboard: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-1 p-1 bg-card border border-border rounded-xl w-fit">
-                {(['projects', 'servers', 'domains'] as const).map(tab => (
+                {availableTabs.map(tab => (
                     <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === tab ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as any)}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                     >
-                        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        {tab.label}
                     </button>
                 ))}
             </div>
@@ -280,7 +291,7 @@ const AnalyticalDashboard: React.FC = () => {
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="w-24 h-24 flex-shrink-0">
+                                        <div className="w-24 h-24 flex-shrink-0 relative">
                                             <Doughnut
                                                 data={{
                                                     labels: ['On Track', 'Waiting'],
@@ -298,6 +309,10 @@ const AnalyticalDashboard: React.FC = () => {
                                                     animation: { animateRotate: true, animateScale: true }
                                                 }}
                                             />
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                <p className="text-lg font-black text-foreground leading-none">{data?.overview?.projects.total || 0}</p>
+                                                <p className="text-[7px] font-bold text-slate-500 uppercase tracking-tighter mt-0.5">Projects</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -340,7 +355,7 @@ const AnalyticalDashboard: React.FC = () => {
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="w-24 h-24 flex-shrink-0">
+                                        <div className="w-24 h-24 flex-shrink-0 relative">
                                             <Doughnut
                                                 data={{
                                                     labels: ['Settled', 'Pending'],
@@ -358,6 +373,10 @@ const AnalyticalDashboard: React.FC = () => {
                                                     animation: { animateRotate: true, animateScale: true }
                                                 }}
                                             />
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                                <Banknote size={14} className="text-rose-500 mb-0.5" />
+                                                <p className="text-[7px] font-bold text-slate-500 uppercase tracking-tighter">Budget</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -383,7 +402,7 @@ const AnalyticalDashboard: React.FC = () => {
                                                     {(data?.overview?.work?.total_teams || 0) - (data?.overview?.work?.unfinished_teams || 0)} / {data?.overview?.work?.total_teams || 0} Unified Teams Done
                                                 </p>
                                             </div>
-                                            <div className="w-14 h-14 flex-shrink-0">
+                                            <div className="w-14 h-14 flex-shrink-0 relative">
                                                 <Doughnut
                                                     data={{
                                                         datasets: [{
@@ -399,6 +418,9 @@ const AnalyticalDashboard: React.FC = () => {
                                                         animation: { animateRotate: true, animateScale: true }
                                                     }}
                                                 />
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                    <p className="text-[10px] font-black text-orange-500">{data?.overview?.work?.unfinished_teams || 0}</p>
+                                                </div>
                                             </div>
                                         </button>
                                         <div className="grid grid-cols-1 gap-2">
@@ -471,8 +493,8 @@ const AnalyticalDashboard: React.FC = () => {
                                                                 {data?.overview?.work?.total_teams || 0}
                                                             </span>
                                                         </th>
-                                                        <th className="px-5 py-4 text-center">Server</th>
-                                                        <th className="px-5 py-4 text-center">Domain</th>
+                                                        {hasPermission('view_server_stats') && <th className="px-5 py-4 text-center">Server</th>}
+                                                        {hasPermission('view_domain_stats') && <th className="px-5 py-4 text-center">Domain</th>}
                                                         <th className="px-5 py-4 text-center">Services</th>
                                                         <th className="px-5 py-4 text-center pr-10">Payment Progress</th>
                                                     </tr>
@@ -523,44 +545,48 @@ const AnalyticalDashboard: React.FC = () => {
                                                                             </div>
                                                                         </div>
                                                                     </td>
-                                                                    <td className="px-5 py-4 text-center">
-                                                                        <div className="flex flex-col items-center">
-                                                                            <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[60px] mb-1" title={p.server_name}>
-                                                                                {p.server_name || 'N/A'}
-                                                                            </span>
-                                                                            <div className={`p-1 w-6 h-6 rounded flex items-center justify-center mx-auto ${p.category_status?.server === 'Paid' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-400'}`} title="Server">
-                                                                                <Server size={12} />
-                                                                            </div>
-                                                                            {(p.server_count ?? 0) > 0 && (
-                                                                                <span className="text-[10px] font-black block mt-1">
-                                                                                    <span className={p.paid_server_count === p.server_count ? "text-emerald-500" : "text-slate-500"}>
-                                                                                        {p.paid_server_count || 0}
-                                                                                    </span>
-                                                                                    <span className="text-slate-400 font-medium mx-0.5">/</span>
-                                                                                    <span className="text-slate-500">{p.server_count}</span>
+                                                                    {hasPermission('view_server_stats') && (
+                                                                        <td className="px-5 py-4 text-center">
+                                                                            <div className="flex flex-col items-center">
+                                                                                <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[60px] mb-1" title={p.server_name}>
+                                                                                    {p.server_name || 'N/A'}
                                                                                 </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
-                                                                    <td className="px-5 py-4 text-center">
-                                                                        <div className="flex flex-col items-center">
-                                                                            <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[60px] mb-1" title={p.domain_name}>
-                                                                                {p.domain_name || 'N/A'}
-                                                                            </span>
-                                                                            <div className={`p-1 w-6 h-6 rounded flex items-center justify-center mx-auto ${(p.category_status as any)?.domain === 'Paid' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-500/10 text-slate-400'}`} title="Domain">
-                                                                                <Globe size={12} />
-                                                                            </div>
-                                                                            {(p.domain_count ?? 0) > 0 && (
-                                                                                <span className="text-[10px] font-black block mt-1">
-                                                                                    <span className={p.paid_domain_count === p.domain_count ? "text-emerald-500" : "text-slate-500"}>
-                                                                                        {p.paid_domain_count || 0}
+                                                                                <div className={`p-1 w-6 h-6 rounded flex items-center justify-center mx-auto ${p.category_status?.server === 'Paid' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-400'}`} title="Server">
+                                                                                    <Server size={12} />
+                                                                                </div>
+                                                                                {(p.server_count ?? 0) > 0 && (
+                                                                                    <span className="text-[10px] font-black block mt-1">
+                                                                                        <span className={p.paid_server_count === p.server_count ? "text-emerald-500" : "text-slate-500"}>
+                                                                                            {p.paid_server_count || 0}
+                                                                                        </span>
+                                                                                        <span className="text-slate-400 font-medium mx-0.5">/</span>
+                                                                                        <span className="text-slate-500">{p.server_count}</span>
                                                                                     </span>
-                                                                                    <span className="text-slate-400 font-medium mx-0.5">/</span>
-                                                                                    <span className="text-slate-500">{p.domain_count}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                    )}
+                                                                    {hasPermission('view_domain_stats') && (
+                                                                        <td className="px-5 py-4 text-center">
+                                                                            <div className="flex flex-col items-center">
+                                                                                <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[60px] mb-1" title={p.domain_name}>
+                                                                                    {p.domain_name || 'N/A'}
                                                                                 </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
+                                                                                <div className={`p-1 w-6 h-6 rounded flex items-center justify-center mx-auto ${(p.category_status as any)?.domain === 'Paid' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-500/10 text-slate-400'}`} title="Domain">
+                                                                                    <Globe size={12} />
+                                                                                </div>
+                                                                                {(p.domain_count ?? 0) > 0 && (
+                                                                                    <span className="text-[10px] font-black block mt-1">
+                                                                                        <span className={p.paid_domain_count === p.domain_count ? "text-emerald-500" : "text-slate-500"}>
+                                                                                            {p.paid_domain_count || 0}
+                                                                                        </span>
+                                                                                        <span className="text-slate-400 font-medium mx-0.5">/</span>
+                                                                                        <span className="text-slate-500">{p.domain_count}</span>
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                    )}
                                                                     <td className="px-5 py-4 text-center">
                                                                         <span className="text-[10px] font-black text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/10">
                                                                             {p.serviceteam_count ?? p.services?.length ?? 0}
@@ -618,7 +644,7 @@ const AnalyticalDashboard: React.FC = () => {
                                                                             exit={{ opacity: 0 }}
                                                                             className="bg-muted/5"
                                                                         >
-                                                                            <td colSpan={7} className="p-0">
+                                                                            <td colSpan={6 + (hasPermission('view_server_stats') ? 1 : 0) + (hasPermission('view_domain_stats') ? 1 : 0)} className="p-0">
                                                                                 <motion.div
                                                                                     initial={{ height: 0, opacity: 0 }}
                                                                                     animate={{ height: "auto", opacity: 1 }}
@@ -765,33 +791,41 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                         ))}
 
                                                                                                         {/* Infrastructure (Server/Domain) */}
-                                                                                                        {p.category_status?.server_items?.map((item: any) => (
-                                                                                                            renderExpandedRow(
-                                                                                                                'Server',
-                                                                                                                item.name || 'Server Hosting',
-                                                                                                                item.cost || 0,
-                                                                                                                item.payment_status || null,
-                                                                                                                item.deadline || null,
-                                                                                                                null,
-                                                                                                                'infra'
-                                                                                                            )
-                                                                                                        ))}
-                                                                                                        {(!p.category_status?.server_items || p.category_status.server_items.length === 0) && p.category_status?.server !== 'NA' && (
-                                                                                                            renderExpandedRow('Server', 'Server Hosting', p.server_cost || 0, p.category_status?.server || null, p.server_deadline || null, null, 'infra')
+                                                                                                        {hasPermission('view_server_stats') && (
+                                                                                                            <>
+                                                                                                                {p.category_status?.server_items?.map((item: any) => (
+                                                                                                                    renderExpandedRow(
+                                                                                                                        'Server',
+                                                                                                                        item.name || 'Server Hosting',
+                                                                                                                        item.cost || 0,
+                                                                                                                        item.payment_status || null,
+                                                                                                                        item.deadline || null,
+                                                                                                                        null,
+                                                                                                                        'infra'
+                                                                                                                    )
+                                                                                                                ))}
+                                                                                                                {(!p.category_status?.server_items || p.category_status.server_items.length === 0) && p.category_status?.server !== 'NA' && (
+                                                                                                                    renderExpandedRow('Server', 'Server Hosting', p.server_cost || 0, p.category_status?.server || null, p.server_deadline || null, null, 'infra')
+                                                                                                                )}
+                                                                                                            </>
                                                                                                         )}
-                                                                                                        {p.category_status?.domain_items?.map((item: any) => (
-                                                                                                            renderExpandedRow(
-                                                                                                                'Domain',
-                                                                                                                item.name || 'Web Domain',
-                                                                                                                item.cost || 0,
-                                                                                                                item.payment_status || null,
-                                                                                                                item.deadline || null,
-                                                                                                                null,
-                                                                                                                'infra'
-                                                                                                            )
-                                                                                                        ))}
-                                                                                                        {(!p.category_status?.domain_items || p.category_status.domain_items.length === 0) && p.category_status?.domain !== 'NA' && (
-                                                                                                            renderExpandedRow('Infrastructure', 'Web Domain', p.domain_cost || 0, p.category_status?.domain || null, p.domain_deadline || null, null, 'infra')
+                                                                                                        {hasPermission('view_domain_stats') && (
+                                                                                                            <>
+                                                                                                                {p.category_status?.domain_items?.map((item: any) => (
+                                                                                                                    renderExpandedRow(
+                                                                                                                        'Domain',
+                                                                                                                        item.name || 'Web Domain',
+                                                                                                                        item.cost || 0,
+                                                                                                                        item.payment_status || null,
+                                                                                                                        item.deadline || null,
+                                                                                                                        null,
+                                                                                                                        'infra'
+                                                                                                                    )
+                                                                                                                ))}
+                                                                                                                {(!p.category_status?.domain_items || p.category_status.domain_items.length === 0) && p.category_status?.domain !== 'NA' && (
+                                                                                                                    renderExpandedRow('Infrastructure', 'Web Domain', p.domain_cost || 0, p.category_status?.domain || null, p.domain_deadline || null, null, 'infra')
+                                                                                                                )}
+                                                                                                            </>
                                                                                                         )}
                                                                                                     </>
                                                                                                 );
@@ -841,154 +875,11 @@ const AnalyticalDashboard: React.FC = () => {
                     )}
 
                     {activeTab === 'servers' && serverData && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-xl hover:translate-y-[-2px] transition-all">
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Assets</p>
-                                    <div className="flex items-end justify-between">
-                                        <p className="text-3xl font-black text-foreground">{serverData.overview.total_servers}</p>
-                                        <Server size={24} className="text-indigo-400 opacity-20" />
-                                    </div>
-                                    <div className="mt-4 flex gap-2">
-                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 text-emerald-500 rounded-md border border-emerald-500/10">{serverData.overview.active_servers} Active</span>
-                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-500/10 text-rose-500 rounded-md border border-rose-500/10">{serverData.overview.expired_servers} Expired</span>
-                                    </div>
-                                </div>
-
-                                <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-xl hover:translate-y-[-2px] transition-all">
-                                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Financial Health</p>
-                                    <div className="flex items-end justify-between">
-                                        <p className="text-3xl font-black text-foreground">
-                                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(serverData.overview.total_cost)}
-                                        </p>
-                                        <Wallet size={24} className="text-emerald-400 opacity-20" />
-                                    </div>
-                                    <div className="mt-4 flex gap-2">
-                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-500/10 text-indigo-400 rounded-md border border-indigo-500/10">{serverData.overview.paid_servers} Paid</span>
-                                        <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-500/10 text-rose-500 rounded-md border border-rose-500/10">{serverData.overview.unpaid_servers} Unpaid</span>
-                                    </div>
-                                </div>
-
-                                <div className="bg-card border border-border rounded-2xl p-5 shadow-xl md:col-span-2">
-                                    <h2 className="text-[10px] font-black text-foreground uppercase tracking-widest mb-4">Infrastructure Type Distribution</h2>
-                                    <div className="flex items-center gap-6 h-full pb-2">
-                                        {serverData.by_server_type.map((type, idx) => {
-                                            const colors = ['#818cf8', '#34d399', '#fb7185', '#60a5fa'];
-                                            return (
-                                                <div key={idx} className="flex-1 space-y-2">
-                                                    <div className="flex justify-between items-end">
-                                                        <p className="text-[10px] font-black text-foreground uppercase">{type.server_type}</p>
-                                                        <p className="text-[10px] font-black text-slate-500">{type.count}</p>
-                                                    </div>
-                                                    <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                                                        <div
-                                                            className="h-full transition-all duration-1000"
-                                                            style={{
-                                                                width: `${(type.count / serverData.overview.total_servers) * 100}%`,
-                                                                backgroundColor: colors[idx % colors.length]
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                <div className="bg-card border border-border rounded-2xl p-6 shadow-xl lg:col-span-1">
-                                    <h2 className="text-[10px] font-black text-foreground uppercase tracking-widest mb-6 border-b border-border pb-4 flex items-center gap-2">
-                                        <ShieldCheck size={14} className="text-emerald-400" /> Top Providers
-                                    </h2>
-                                    <div className="space-y-4">
-                                        {serverData.by_accrued_by.map((acc, idx) => (
-                                            <div key={idx} className="flex items-center justify-between group/acc p-3 hover:bg-muted/30 rounded-xl transition-all border border-transparent hover:border-border">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-lg bg-indigo-500/5 flex items-center justify-center border border-indigo-500/10">
-                                                        <span className="text-[10px] font-black text-indigo-400 uppercase">{acc.accrued_by.charAt(0)}</span>
-                                                    </div>
-                                                    <p className="text-xs font-black text-foreground uppercase">{acc.accrued_by}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-sm font-black text-foreground">{acc.count}</p>
-                                                    <p className="text-[9px] font-bold text-slate-500 uppercase">Instances</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xl lg:col-span-2">
-                                    <h2 className="p-5 text-[10px] font-black text-foreground uppercase tracking-widest border-b border-border flex items-center gap-2">
-                                        <BellRing size={14} className="text-rose-400" /> Expiring Infrastructure
-                                    </h2>
-                                    <div className="divide-y divide-border max-h-[300px] overflow-y-auto">
-                                        {serverData.expiring_soon.map(s => (
-                                            <div key={s.id} className="p-5 hover:bg-muted/30 transition-all flex justify-between items-center group">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-xl bg-rose-500/5 flex items-center justify-center border border-rose-500/10 group-hover:scale-105 transition-transform">
-                                                        <Zap size={18} className="text-rose-400" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xs font-black text-foreground uppercase tracking-tight">{s.name}</p>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <span className="text-[9px] font-black text-slate-500 uppercase bg-slate-500/5 px-1.5 py-0.5 rounded border border-border">{s.server_type}</span>
-                                                            {s.project && (
-                                                                <span className="text-[9px] font-bold text-indigo-400 uppercase flex items-center gap-1">
-                                                                    <Layout size={10} /> {s.project}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="text-sm font-black text-rose-500 uppercase tracking-tighter">
-                                                        {new Date(s.expiration_date).toLocaleDateString()}
-                                                    </p>
-                                                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">EXPIRES</p>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {serverData.expiring_soon.length === 0 && (
-                                            <div className="p-10 text-center">
-                                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">No assets expiring soon</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <ServerAnalytical serverData={serverData} />
                     )}
 
                     {activeTab === 'domains' && domainData && (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-xl">
-                                    <h2 className="text-[10px] font-black text-foreground uppercase tracking-widest mb-5">Asset Pulse</h2>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="px-4 py-3 bg-indigo-500/5 border border-indigo-500/10 rounded-xl">
-                                            <p className="text-[10px] font-bold text-slate-500 mb-1">Total</p>
-                                            <p className="text-2xl font-black text-foreground">{domainData.overview.total_domains}</p>
-                                        </div>
-                                        <div className="px-4 py-3 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
-                                            <p className="text-[10px] font-bold text-emerald-400 mb-1">Active</p>
-                                            <p className="text-2xl font-black text-foreground">{domainData.overview.active_domains}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xl">
-                                    <h2 className="p-5 text-[10px] font-black text-foreground uppercase tracking-widest border-b border-border">Expiring Soon</h2>
-                                    <div className="divide-y divide-border max-h-40 overflow-y-auto">
-                                        {domainData.expiring_soon.map(d => (
-                                            <div key={d.id} className="p-4 flex justify-between items-center text-xs">
-                                                <p className="font-black text-foreground uppercase">{d.domain}</p>
-                                                <span className="text-rose-400 font-black">{new Date(d.expiration_date).toLocaleDateString()}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <DomainAnalytical domainData={domainData} />
                     )}
                 </>
             )}

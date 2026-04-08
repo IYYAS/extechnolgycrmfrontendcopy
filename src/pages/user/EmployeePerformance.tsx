@@ -7,7 +7,10 @@ import {
     ListTodo, 
     Loader2,
     Clock,
-    TrendingUp
+    TrendingUp,
+    Users,
+    Search,
+    ChevronDown
 } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { Doughnut } from 'react-chartjs-2';
@@ -22,44 +25,72 @@ import {
 import { 
     getUserWorkDetails, 
     getEmployeePerformance, 
+    getUsers,
     type UserWorkDetails, 
-    type EmployeePerformance as EmployeePerformanceData 
+    type EmployeePerformance as EmployeePerformanceData,
+    type User
 } from './userService';
+import { usePermission } from '../../hooks/usePermission';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale);
 
 const EmployeePerformance: React.FC = () => {
     const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const { hasPermission } = usePermission();
+    const canViewAll = hasPermission('view_all_employee_performance');
+    
     const [performance, setPerformance] = useState<EmployeePerformanceData | null>(null);
     const [workDetails, setWorkDetails] = useState<UserWorkDetails | null>(null);
+    const [employees, setEmployees] = useState<User[]>([]);
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [activeFilter, setActiveFilter] = useState<{ status?: string[]; type?: string } | null>(null);
+    const [showEmployeeList, setShowEmployeeList] = useState(false);
+    const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+
+    useEffect(() => {
+        const fetchInitialData = async () => {
+            if (canViewAll) {
+                try {
+                    const resp = await getUsers(1);
+                    setEmployees(resp.results);
+                } catch (err) {
+                    console.error('Failed to fetch employees:', err);
+                }
+            }
+        };
+        fetchInitialData();
+    }, [canViewAll]);
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!user.id) {
+            const userIdToFetch = selectedEmployeeId || user.id;
+            
+            if (!userIdToFetch) {
                 setLoading(false);
                 setError("User session not found. Please log in again.");
                 return;
             }
             
+            setLoading(true);
             try {
                 const [perfData, detailsData] = await Promise.all([
-                    getEmployeePerformance(),
-                    getUserWorkDetails(user.id)
+                    getEmployeePerformance(selectedEmployeeId || undefined),
+                    getUserWorkDetails(userIdToFetch)
                 ]);
                 setPerformance(perfData);
                 setWorkDetails(detailsData);
+                setError(null);
             } catch (err) {
                 console.error('Failed to fetch performance data:', err);
-                setError("Failed to load performance metrics. Our team is looking into it.");
+                setError("Failed to load performance metrics for this employee.");
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, [user.id]);
+    }, [user.id, selectedEmployeeId]);
 
     const allAssignmentsRaw = performance ? [
         ...performance.total_committed_project_team.map(p => ({ ...p, type: 'Project', name: p.project_name, role: 'Member' })),
@@ -167,8 +198,80 @@ const EmployeePerformance: React.FC = () => {
                         <TrendingUp size={36} className="text-primary" />
                         Assignment Dashboard
                     </h1>
-                    <p className="text-muted font-medium mt-1 text-lg italic">Welcome back, <span className="text-foreground font-black">{performance.employee_name}</span>. Here's your current workload.</p>
+                    <p className="text-muted font-medium mt-1 text-lg italic">
+                        {selectedEmployeeId ? (
+                            <>Viewing performance for <span className="text-foreground font-black">{performance.employee_name}</span></>
+                        ) : (
+                            <>Welcome back, <span className="text-foreground font-black">{performance.employee_name}</span>. Here's your current workload.</>
+                        )}
+                    </p>
                 </div>
+
+                {canViewAll && (
+                    <div className="relative">
+                        <button 
+                            onClick={() => setShowEmployeeList(!showEmployeeList)}
+                            className="flex items-center gap-3 px-6 py-3 bg-card border border-border rounded-2xl shadow-sm hover:border-primary/50 transition-all font-black italic text-sm"
+                        >
+                            <Users size={18} className="text-primary" />
+                            {selectedEmployeeId ? performance.employee_name : 'Select Employee'}
+                            <ChevronDown size={16} className={`transition-transform ${showEmployeeList ? 'rotate-180' : ''}`} />
+                        </button>
+                        
+                        {showEmployeeList && (
+                            <div className="absolute right-0 mt-2 w-72 bg-card border border-border rounded-3xl shadow-2xl z-50 overflow-hidden">
+                                <div className="p-4 border-b border-border bg-muted/5">
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Search team member..." 
+                                            value={employeeSearchTerm}
+                                            onChange={(e) => setEmployeeSearchTerm(e.target.value)}
+                                            className="w-full pl-9 pr-4 py-2 bg-background border border-border rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-primary/20"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                                    <button 
+                                        onClick={() => {
+                                            setSelectedEmployeeId(null);
+                                            setShowEmployeeList(false);
+                                        }}
+                                        className={`w-full px-6 py-3 text-left hover:bg-muted/10 transition-colors flex items-center gap-3 ${!selectedEmployeeId ? 'bg-primary/5 text-primary' : ''}`}
+                                    >
+                                        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-[10px] font-black italic">ME</div>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-black italic">My Performance</span>
+                                            <span className="text-[10px] font-bold text-muted uppercase tracking-widest">Self</span>
+                                        </div>
+                                    </button>
+                                    {employees
+                                        .filter(e => e.id !== user.id && (e.username.toLowerCase().includes(employeeSearchTerm.toLowerCase()) || e.email.toLowerCase().includes(employeeSearchTerm.toLowerCase())))
+                                        .map(emp => (
+                                            <button 
+                                                key={emp.id}
+                                                onClick={() => {
+                                                    setSelectedEmployeeId(emp.id);
+                                                    setShowEmployeeList(false);
+                                                }}
+                                                className={`w-full px-6 py-3 text-left hover:bg-muted/10 transition-colors flex items-center gap-3 ${selectedEmployeeId === emp.id ? 'bg-primary/5 text-primary' : ''}`}
+                                            >
+                                                <div className="w-8 h-8 rounded-lg bg-muted text-foreground flex items-center justify-center text-[10px] font-black italic">
+                                                    {emp.username.substring(0, 2).toUpperCase()}
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-black italic">{emp.username}</span>
+                                                    <span className="text-[10px] font-bold text-muted uppercase tracking-widest">{emp.designation || 'Member'}</span>
+                                                </div>
+                                            </button>
+                                        ))
+                                    }
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Top Stats Grid */}

@@ -4,6 +4,7 @@ import { getActivities, deleteActivity, getEmployeeActivities } from './activity
 import type { EmployeeDailyActivity } from './activityService';
 import { getProjects, getTeams } from '../projects/projectService';
 import { getUsers } from '../user/userService';
+import { usePermission } from '../../hooks/usePermission';
 import {
     Search,
     Plus,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 
 const ActivityList: React.FC = () => {
+    const { hasPermission } = usePermission();
     const [activities, setActivities] = useState<EmployeeDailyActivity[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -162,7 +164,7 @@ const ActivityList: React.FC = () => {
                         {isEmployeeView ? 'Administrative Activity Oversight' : 'Employee Productivity & Timeline Tracking'}
                     </p>
                 </div>
-                {!isEmployeeView && (
+                {!isEmployeeView && hasPermission('add_employeedailyactivity') && (
                     <button onClick={() => navigate('/activities/new')} className="flex items-center gap-2 px-6 py-3 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 hover:shadow-primary/50 transition-all hover:scale-[1.02] active:scale-95">
                         <Plus size={20} strokeWidth={3} />
                         <span>New Activity</span>
@@ -339,8 +341,12 @@ const ActivityList: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-6 text-right">
                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
-                                            <button onClick={() => navigate(`/activities/edit/${activity.id}`)} className="p-2 hover:bg-primary/10 text-primary rounded-xl transition-colors border border-transparent hover:border-primary/20"><Edit2 size={16} /></button>
-                                            <button onClick={() => handleDelete(activity.id)} className="p-2 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors border border-transparent hover:border-rose-500/20"><Trash2 size={16} /></button>
+                                            {hasPermission('change_employeedailyactivity') && (
+                                                <button onClick={() => navigate(`/activities/edit/${activity.id}`)} className="p-2 hover:bg-primary/10 text-primary rounded-xl transition-colors border border-transparent hover:border-primary/20"><Edit2 size={16} /></button>
+                                            )}
+                                            {hasPermission('delete_employeedailyactivity') && (
+                                                <button onClick={() => handleDelete(activity.id)} className="p-2 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors border border-transparent hover:border-rose-500/20"><Trash2 size={16} /></button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -354,6 +360,14 @@ const ActivityList: React.FC = () => {
                         <div className="inline-flex p-6 bg-muted/20 rounded-[2rem] text-muted mb-4"><Calendar size={48} /></div>
                         <h3 className="text-lg font-bold text-foreground">No activities found</h3>
                         <p className="text-muted text-sm max-w-xs mx-auto">Try adjusting your search term or add a new activity report.</p>
+                        {!isEmployeeView && hasPermission('add_employeedailyactivity') && (
+                            <button 
+                                onClick={() => navigate('/activities/new')} 
+                                className="mt-6 px-6 py-2.5 bg-primary text-white font-black rounded-2xl shadow-lg shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all"
+                            >
+                                New Activity
+                            </button>
+                        )}
                     </div>
                 )}
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProjects, deleteProject } from './projectService';
+import { usePermission } from '../../hooks/usePermission';
 import type { Project } from './projectService';
 import {
     LayoutGrid,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 
 const ProjectList: React.FC = () => {
+    const { hasPermission } = usePermission();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -121,13 +123,15 @@ const ProjectList: React.FC = () => {
                             <LayoutGrid size={18} />
                         </button>
                     </div>
-                    <button
-                        onClick={() => navigate('/projects/new')}
-                        className="flex items-center space-x-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white font-semibold rounded-xl transition-all shadow-lg shadow-primary/20"
-                    >
-                        <Plus size={20} />
-                        <span>Create Project</span>
-                    </button>
+                    {hasPermission('add_project') && (
+                        <button
+                            onClick={() => navigate('/projects/new')}
+                            className="flex items-center space-x-2 px-5 py-2.5 bg-primary hover:bg-primary-hover text-white font-semibold rounded-xl transition-all shadow-lg shadow-primary/20"
+                        >
+                            <Plus size={20} />
+                            <span>Create Project</span>
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -255,20 +259,24 @@ const ProjectList: React.FC = () => {
                                                         >
                                                             <ClipboardList size={18} />
                                                         </button>
-                                                        <button
-                                                            onClick={() => navigate(`/projects/edit/${project.id}`)}
-                                                            className="p-2 text-muted hover:text-primary hover:bg-primary-subtle rounded-lg transition-all"
-                                                            title="Edit"
-                                                        >
-                                                            <Edit2 size={18} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(project.id, baseInfo?.name || project.description)}
-                                                            className="p-2 text-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 size={18} />
-                                                        </button>
+                                                        {hasPermission('change_project') && (
+                                                            <button
+                                                                onClick={() => navigate(`/projects/edit/${project.id}`)}
+                                                                className="p-2 text-muted hover:text-primary hover:bg-primary-subtle rounded-lg transition-all"
+                                                                title="Edit"
+                                                            >
+                                                                <Edit2 size={18} />
+                                                            </button>
+                                                        )}
+                                                        {hasPermission('delete_project') && (
+                                                            <button
+                                                                onClick={() => handleDelete(project.id, baseInfo?.name || project.description)}
+                                                                className="p-2 text-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                                                                title="Delete"
+                                                            >
+                                                                <Trash2 size={18} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -294,16 +302,18 @@ const ProjectList: React.FC = () => {
                                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${getStatusStyles(project.status)}`}>
                                                 {project.status}
                                             </span>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDelete(project.id, baseInfo?.name || project.description);
-                                                }}
-                                                className="p-1.5 text-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
-                                                title="Delete"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
+                                            {hasPermission('delete_project') && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDelete(project.id, baseInfo?.name || project.description);
+                                                    }}
+                                                    className="p-1.5 text-muted hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                                                    title="Delete"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
                                         </div>
 
                                         <div className="flex items-start space-x-4 mb-4">

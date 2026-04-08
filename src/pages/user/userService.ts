@@ -149,7 +149,7 @@ export interface TeamPerformanceResponse {
 }
 
 export const getTeamPerformance = async (teamId?: number): Promise<any> => {
-  const url = teamId ? `/team-performance/${teamId}/` : '/team-performance/';
+  const url = teamId ? `/team-performance/?team_id=${teamId}` : '/team-performance/';
   const response = await api.get<any>(url);
   return response.data;
 };

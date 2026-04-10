@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { usePermission } from '../hooks/usePermission';
 import { ShieldAlert, ArrowLeft, MessageSquare } from 'lucide-react';
 

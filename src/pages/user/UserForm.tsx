@@ -51,7 +51,7 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                         last_name: data.last_name,
                         phone_number: data.phone_number || '',
                         designation: data.designation || '',
-                        role_id: data.role?.id || null
+                        role_id: data.roles?.[0]?.id || null
                     } as any);
                 } catch (error) {
                     console.error('Failed to fetch user for editing:', error);
@@ -69,7 +69,7 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                 last_name: initialUser.last_name,
                 phone_number: initialUser.phone_number || '',
                 designation: initialUser.designation || '',
-                role_id: initialUser.role?.id || null
+                role_id: initialUser.roles?.[0]?.id || null
             } as any);
         }
     }, [id, initialUser, reset, navigate]);

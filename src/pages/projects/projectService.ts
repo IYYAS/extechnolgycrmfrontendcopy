@@ -118,7 +118,9 @@ export interface TeamDetail {
     created_at: string;
     updated_at: string;
     team_lead: number | null;
+    team_lead_name?: string;
     members: number[];
+    member_names?: string[];
     members_details?: User[];
 }
 
@@ -134,6 +136,7 @@ export interface ProjectTeamMemberEntry {
     status: string;
     notes: string;
     employee: number;
+    employee_name?: string;
 }
 
 export interface ProjectTeam {
@@ -159,6 +162,7 @@ export interface ProjectTeamMember {
     status: string;
     notes: string;
     employee: number;
+    employee_name?: string;
 }
 
 // Service member with employee detail
@@ -181,6 +185,7 @@ export interface ServiceMember {
     allocated_days: number;
     actual_days: number;
     cost: string;
+    employee_name?: string;
 }
 
 export interface ServiceTeam {
@@ -392,6 +397,11 @@ export const createProjectNature = async (name: string): Promise<ProjectNature> 
     const response = await api.post<ProjectNature>('/project-natures/', { name });
     return response.data;
 };
+
+export const deleteProjectNature = async (id: number): Promise<void> => {
+    await api.delete(`/project-natures/${id}/`);
+};
+
 export interface ProjectSummary {
     id: number;
     name: string | null;

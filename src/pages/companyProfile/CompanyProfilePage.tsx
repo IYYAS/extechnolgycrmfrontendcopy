@@ -101,15 +101,17 @@ const CompanyProfilePage: React.FC = () => {
         <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-500">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-black tracking-tight text-foreground">Company Profiles</h1>
+                <h1 className="text-3xl font-black tracking-tight text-foreground">Company Profile</h1>
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate('/company-profile/new')}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-2xl font-bold text-sm hover:shadow-lg hover:shadow-primary/20 transition-all"
-                    >
-                        <Plus size={18} />
-                        New Profile
-                    </button>
+                    {profiles.length === 0 && (
+                        <button
+                            onClick={() => navigate('/company-profile/new')}
+                            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-2xl font-bold text-sm hover:shadow-lg hover:shadow-primary/20 transition-all"
+                        >
+                            <Plus size={18} />
+                            New Profile
+                        </button>
+                    )}
                 </div>
             </div>
 

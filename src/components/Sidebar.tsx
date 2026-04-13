@@ -319,7 +319,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 component={<Link to="/company-profile" />}
                                 active={isActive('/company-profile')}
                             >
-                                Company
+                                Extech Profile
                             </MenuItem>
                         )}
                         {canView('view_role') && (

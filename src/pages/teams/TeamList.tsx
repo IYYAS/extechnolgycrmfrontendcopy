@@ -12,7 +12,6 @@ import {
     ChevronRight,
     Users,
     UserCircle,
-    Briefcase,
     Layers
 } from 'lucide-react';
 
@@ -126,7 +125,7 @@ const TeamList: React.FC = () => {
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest">Team Group</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest">Team Lead</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest text-center">Members</th>
-                                <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest">Projects</th>
+                                <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest text-center">Created At</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest text-right">Actions</th>
                             </tr>
                         </thead>
@@ -152,11 +151,10 @@ const TeamList: React.FC = () => {
                                             {team.members?.length || 0} Members
                                         </span>
                                     </td>
-                                    <td className="px-8 py-6">
-                                        <div className="flex items-center gap-2">
-                                            <Briefcase size={14} className="text-muted" />
-                                            <p className="text-sm font-bold text-foreground">{team.assigned_projects?.length || 0} Assigned</p>
-                                        </div>
+                                    <td className="px-8 py-6 text-center">
+                                        <p className="text-xs font-bold text-muted">
+                                            {team.created_at ? new Date(team.created_at).toLocaleDateString('en-GB') : '-'}
+                                        </p>
                                     </td>
                                     <td className="px-8 py-6 text-right">
                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">

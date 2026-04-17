@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Server, Layout, FilterX, Users, AlertTriangle, Calendar } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Server, Layout, FilterX, Users, AlertTriangle, Calendar, MousePointer2, Plus, ArrowRight } from 'lucide-react';
 import { Doughnut } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -22,6 +23,72 @@ const CHART_COLORS = ['#818cf8', '#34d399', '#fb7185', '#60a5fa', '#f59e0b', '#a
 
 const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
     const [activeFilter, setActiveFilter] = useState<ServerFilterType>('all');
+    const navigate = useNavigate();
+
+    if (serverData.overview.total_servers === 0) {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="max-w-4xl mx-auto py-12 px-6"
+            >
+                <div className="bg-card border border-border rounded-[2.5rem] p-12 shadow-2xl relative overflow-hidden text-center">
+                    {/* Decorative Background Elements */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full -mr-20 -mt-20" />
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/10 blur-3xl rounded-full -ml-20 -mb-20" />
+
+                    <div className="relative z-10 flex flex-col items-center">
+                        <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center mb-8 border border-primary/20 shadow-inner group">
+                            <Server size={48} className="text-primary group-hover:scale-110 transition-transform duration-500" />
+                        </div>
+
+                        <h2 className="text-3xl font-black text-foreground tracking-tight mb-4 uppercase">
+                            No Servers Detected
+                        </h2>
+
+                        <p className="text-slate-500 text-lg max-w-xl mx-auto mb-10 font-medium">
+                            Your server infrastructure is currently empty. To see detailed performance analytics and tracking, you need to register your project servers first.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl mb-12">
+                            {[
+                                { icon: <MousePointer2 size={18} />, title: "Step 1", desc: "Go to Projects section" },
+                                { icon: <Layout size={18} />, title: "Step 2", desc: "Select the target Project" },
+                                { icon: <Plus size={18} />, title: "Step 3", desc: "Add Server in Infrastructure" }
+                            ].map((step, idx) => (
+                                <motion.div
+                                    key={idx}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.2 + (idx * 0.1) }}
+                                    className="relative group p-6 rounded-3xl border border-border/50 transition-all duration-300 bg-muted/20 hover:border-primary/40 hover:bg-muted/40"
+                                >
+                                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                                        {step.icon}
+                                    </div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-primary opacity-80">{step.title}</p>
+                                    <p className="text-xs font-bold text-foreground/70 uppercase tracking-tight leading-relaxed">{step.desc}</p>
+                                </motion.div>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={() => navigate('/projects')}
+                            className="group relative px-10 py-5 bg-primary hover:bg-primary-hover text-white font-black uppercase text-sm rounded-[2rem] transition-all shadow-xl shadow-primary/25 flex items-center gap-3 active:scale-95"
+                        >
+                            <Layout size={20} className="group-hover:scale-110 transition-transform" />
+                            <span>Navigate to Projects</span>
+                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                        </button>
+
+                        <p className="mt-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] opacity-40">
+                            Analytics will sync automatically after registration
+                        </p>
+                    </div>
+                </div>
+            </motion.div>
+        );
+    }
 
     const filteredServers = serverData.servers_list?.filter(server => {
         if (activeFilter === 'all') return true;
@@ -241,8 +308,8 @@ const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
                                     <p className="text-xs font-black text-rose-500 tabular-nums">{new Date(s.expiration_date).toLocaleDateString()}</p>
                                     <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${s.days_until_expiry != null && s.days_until_expiry < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
                                         {s.days_until_expiry != null
-                                            ? (s.days_until_expiry < 0 
-                                                ? `Overdue by ${Math.abs(s.days_until_expiry)} days` 
+                                            ? (s.days_until_expiry < 0
+                                                ? `Overdue by ${Math.abs(s.days_until_expiry)} days`
                                                 : `${s.days_until_expiry} days left`)
                                             : 'Expires'}
                                     </p>
@@ -313,8 +380,8 @@ const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
                                                 </p>
                                                 {server.days_until_expiry != null && (
                                                     <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${server.days_until_expiry < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
-                                                        {server.days_until_expiry < 0 
-                                                            ? `Overdue: ${Math.abs(server.days_until_expiry)} days` 
+                                                        {server.days_until_expiry < 0
+                                                            ? `Overdue: ${Math.abs(server.days_until_expiry)} days`
                                                             : `${server.days_until_expiry} days left`}
                                                     </p>
                                                 )}
@@ -336,18 +403,16 @@ const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
 
                                     <div className="flex items-center justify-between mt-5 pt-4 border-t border-border/50">
                                         <div className="flex gap-2">
-                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${
-                                                (server.effective_status || server.status)?.toLowerCase() === 'active' 
-                                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' 
+                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${(server.effective_status || server.status)?.toLowerCase() === 'active'
+                                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                                                     : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                                            }`}>
+                                                }`}>
                                                 {(server.effective_status || server.status).toUpperCase()}
                                             </span>
-                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${
-                                                server.payment_status?.toLowerCase() === 'paid' 
-                                                    ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' 
+                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${server.payment_status?.toLowerCase() === 'paid'
+                                                    ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
                                                     : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                                            }`}>
+                                                }`}>
                                                 {server.payment_status?.toUpperCase() || 'UNPAID'}
                                             </span>
                                         </div>

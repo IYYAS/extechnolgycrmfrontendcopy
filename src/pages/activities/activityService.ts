@@ -12,7 +12,8 @@ export interface EmployeeDailyActivity {
     pending_work_percentage: number;
     target_work_percentage: number;
     is_timeline_exceeded: boolean;
-    delay_reason: string;
+    delay_reason: string | null;
+    comment_count?: number;
     created_at: string;
     employee: number;
     team: number | null;

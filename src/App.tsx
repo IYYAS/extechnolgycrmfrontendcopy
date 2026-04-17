@@ -34,6 +34,8 @@ import InvoicePaymentList from './pages/invoices/InvoicePaymentList';
 import InvoicePaymentForm from './pages/invoices/InvoicePaymentForm';
 import ActivityList from './pages/activities/ActivityList';
 import ActivityForm from './pages/activities/ActivityForm';
+import ActivityCommentForm from './pages/activities/ActivityCommentForm';
+import NotificationList from './pages/notifications/NotificationList';
 import LeaveList from './pages/leaves/LeaveList';
 import LeaveForm from './pages/leaves/LeaveForm';
 import SalaryList from './pages/salaries/SalaryList';
@@ -212,6 +214,12 @@ function App() {
                                     <ActivityForm />
                                 </PermissionGate>
                             } />
+                            <Route path="/activities/:activityId/comments" element={
+                                <PermissionGate permission={['view_all_activities', 'view_own_activities']}>
+                                    <ActivityCommentForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/notifications" element={<NotificationList />} />
                             <Route path="/leaves" element={
                                 <PermissionGate permission="view_employeeleave">
                                     <LeaveList />

@@ -9,7 +9,6 @@ import {
     Search,
     Plus,
     Calendar,
-    Clock,
     Loader2,
     Edit2,
     Trash2,
@@ -18,7 +17,8 @@ import {
     ChevronLeft,
     ChevronRight,
     Users,
-    FilePlus
+    FilePlus,
+    MessageSquare
 } from 'lucide-react';
 
 const ActivityList: React.FC = () => {
@@ -48,7 +48,7 @@ const ActivityList: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            const fetchActivitiesPromise = isEmployeeView 
+            const fetchActivitiesPromise = isEmployeeView
                 ? getEmployeeActivities(parseInt(employeeId as string), page, sDate, eDate)
                 : getActivities(page, search, sDate, eDate, undefined, empId || undefined);
 
@@ -132,9 +132,11 @@ const ActivityList: React.FC = () => {
     };
 
     // Summary Calculations
-    const totalHours = activities.reduce((acc, act) => acc + parseFloat(act.hours_spent), 0).toFixed(1);
+    const avgTarget = activities.length > 0
+        ? (activities.reduce((acc, act) => acc + (act.target_work_percentage || 0), 0) / activities.length).toFixed(0)
+        : 0;
     const avgCompletion = activities.length > 0
-        ? (activities.reduce((acc, act) => acc + (100 - act.pending_work_percentage), 0) / activities.length).toFixed(0)
+        ? (activities.reduce((acc, act) => acc + (100 - (act.pending_work_percentage || 0)), 0) / activities.length).toFixed(0)
         : 0;
     const delayedCount = activities.filter(a => a.is_timeline_exceeded).length;
 
@@ -175,10 +177,10 @@ const ActivityList: React.FC = () => {
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-card border border-border p-6 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
-                    <div className="absolute top-0 right-0 p-8 text-primary/5 group-hover:text-primary/10 transition-colors"><Clock size={80} /></div>
-                    <p className="text-[10px] font-black uppercase text-muted tracking-[0.2em]">Total Hours Tracked</p>
-                    <h2 className="text-4xl font-black mt-2 text-primary">{totalHours}h</h2>
-                    <p className="text-xs text-muted font-bold mt-1">In current view</p>
+                    <div className="absolute top-0 right-0 p-8 text-primary/5 group-hover:text-primary/10 transition-colors"><TrendingUp size={80} /></div>
+                    <p className="text-[10px] font-black uppercase text-muted tracking-[0.2em]">Avg. Target Progress</p>
+                    <h2 className="text-4xl font-black mt-2 text-primary">{avgTarget}%</h2>
+                    <p className="text-xs text-muted font-bold mt-1">Project milestone</p>
                 </div>
                 <div className="bg-card border border-border p-6 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-8 text-emerald-500/5 group-hover:text-emerald-500/10 transition-colors"><TrendingUp size={80} /></div>
@@ -212,8 +214,8 @@ const ActivityList: React.FC = () => {
                         {!isEmployeeView && (
                             <div className="flex items-center gap-2 bg-background border border-border rounded-2xl px-4 py-2">
                                 <Users size={16} className="text-muted" />
-                                <select 
-                                    value={selectedEmployeeId || ''} 
+                                <select
+                                    value={selectedEmployeeId || ''}
                                     onChange={(e) => setSelectedEmployeeId(e.target.value ? parseInt(e.target.value) : null)}
                                     className="bg-transparent border-none focus:ring-0 text-xs font-bold text-foreground outline-none cursor-pointer max-w-[150px]"
                                 >
@@ -227,22 +229,22 @@ const ActivityList: React.FC = () => {
 
                         <div className="flex items-center gap-2 bg-background border border-border rounded-2xl px-4 py-2">
                             <Calendar size={16} className="text-muted" />
-                            <input 
-                                type="date" 
-                                value={startDate} 
+                            <input
+                                type="date"
+                                value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
                                 className="bg-transparent border-none focus:ring-0 text-xs font-bold text-foreground outline-none"
                             />
                             <span className="text-muted text-xs font-black uppercase">to</span>
-                            <input 
-                                type="date" 
-                                value={endDate} 
+                            <input
+                                type="date"
+                                value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
                                 className="bg-transparent border-none focus:ring-0 text-xs font-bold text-foreground outline-none"
                             />
                         </div>
 
-                        <button 
+                        <button
                             onClick={handleExportPDF}
                             className="flex items-center gap-2 px-6 py-2.5 bg-indigo-500/10 text-indigo-500 font-black rounded-2xl border border-indigo-500/20 hover:bg-indigo-500 hover:text-white transition-all shadow-lg shadow-indigo-500/10"
                         >
@@ -250,7 +252,7 @@ const ActivityList: React.FC = () => {
                             <span>Export PDF</span>
                         </button>
 
-                        <button 
+                        <button
                             onClick={handleExportWord}
                             className="flex items-center gap-2 px-6 py-2.5 bg-blue-500/10 text-blue-500 font-black rounded-2xl border border-blue-500/20 hover:bg-blue-500 hover:text-white transition-all shadow-lg shadow-blue-500/10"
                         >
@@ -315,9 +317,11 @@ const ActivityList: React.FC = () => {
                                         <div className="flex flex-col gap-1 min-w-[100px]">
                                             <div className="flex items-center justify-between gap-4">
                                                 <div className="flex flex-col">
-                                                    <p className="text-xs font-black text-foreground leading-none">{activity.hours_spent}h</p>
+                                                    <p className="text-[9px] font-black text-muted uppercase tracking-tighter">PEND</p>
+                                                    <p className="text-xs font-black text-foreground leading-none">{activity.pending_work_percentage}%</p>
                                                 </div>
                                                 <div className="flex flex-col text-right">
+                                                    <p className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter">TARG</p>
                                                     <p className="text-xs font-black text-indigo-500 leading-none">{activity.target_work_percentage}%</p>
                                                 </div>
                                             </div>
@@ -330,7 +334,7 @@ const ActivityList: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-6 text-center">
                                         {activity.is_timeline_exceeded ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-500/10 text-rose-500 text-[9px] font-black rounded-md border border-rose-500/20 uppercase" title={activity.delay_reason}>
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-500/10 text-rose-500 text-[9px] font-black rounded-md border border-rose-500/20 uppercase" title={activity.delay_reason || undefined}>
                                                 Lag
                                             </span>
                                         ) : (
@@ -341,11 +345,23 @@ const ActivityList: React.FC = () => {
                                     </td>
                                     <td className="px-4 py-6 text-right">
                                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                                            <button
+                                                onClick={() => navigate(`/activities/${activity.id}/comments`)}
+                                                className="p-2 hover:bg-indigo-500/10 text-indigo-500 rounded-xl transition-colors border border-transparent hover:border-indigo-500/20 relative"
+                                                title="Comments & Feedback"
+                                            >
+                                                <MessageSquare size={16} />
+                                                {activity.comment_count !== undefined && activity.comment_count > 0 && (
+                                                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-500 text-[10px] font-black text-white shadow-sm ring-2 ring-background">
+                                                        {activity.comment_count}
+                                                    </span>
+                                                )}
+                                            </button>
                                             {hasPermission('change_employeedailyactivity') && (
-                                                <button onClick={() => navigate(`/activities/edit/${activity.id}`)} className="p-2 hover:bg-primary/10 text-primary rounded-xl transition-colors border border-transparent hover:border-primary/20"><Edit2 size={16} /></button>
+                                                <button onClick={() => navigate(`/activities/edit/${activity.id}`)} className="p-2 hover:bg-primary/10 text-primary rounded-xl transition-colors border border-transparent hover:border-primary/20" title="Edit Report"><Edit2 size={16} /></button>
                                             )}
                                             {hasPermission('delete_employeedailyactivity') && (
-                                                <button onClick={() => handleDelete(activity.id)} className="p-2 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors border border-transparent hover:border-rose-500/20"><Trash2 size={16} /></button>
+                                                <button onClick={() => handleDelete(activity.id)} className="p-2 hover:bg-rose-500/10 text-rose-500 rounded-xl transition-colors border border-transparent hover:border-rose-500/20" title="Delete Report"><Trash2 size={16} /></button>
                                             )}
                                         </div>
                                     </td>
@@ -361,8 +377,8 @@ const ActivityList: React.FC = () => {
                         <h3 className="text-lg font-bold text-foreground">No activities found</h3>
                         <p className="text-muted text-sm max-w-xs mx-auto">Try adjusting your search term or add a new activity report.</p>
                         {!isEmployeeView && hasPermission('add_employeedailyactivity') && (
-                            <button 
-                                onClick={() => navigate('/activities/new')} 
+                            <button
+                                onClick={() => navigate('/activities/new')}
                                 className="mt-6 px-6 py-2.5 bg-primary text-white font-black rounded-2xl shadow-lg shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all"
                             >
                                 New Activity

@@ -24,11 +24,13 @@ import {
     BarChart3,
     Globe,
     UserCog,
-    Layers
+    Layers,
+    Bell
 } from 'lucide-react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useTheme, type AccentColor } from '../context/ThemeContext';
 import { usePermission } from '../hooks/usePermission';
+import { getUnreadCount } from '../pages/notifications/notificationService';
 
 interface SidebarProps {
     collapsed: boolean;
@@ -39,6 +41,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
     const navigate = useNavigate();
     const location = useLocation();
     const { mode, toggleMode, accentColor, setAccentColor } = useTheme();
+    const [unreadCount, setUnreadCount] = React.useState(0);
 
     let user: any = {};
     try {
@@ -55,6 +58,19 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
         localStorage.removeItem('active_role');
         navigate('/login');
     };
+
+    const fetchUnreadCount = async () => {
+        try {
+            const count = await getUnreadCount();
+            setUnreadCount(count);
+        } catch (error) {
+            console.error('Failed to fetch unread count', error);
+        }
+    };
+
+    React.useEffect(() => {
+        fetchUnreadCount();
+    }, []);
 
     const isActive = (path: string) => location.pathname === path;
 
@@ -105,14 +121,16 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                 {/* Theme Selector */}
                 {!collapsed && (
                     <div className="px-6 py-4 border-b border-white/5 space-y-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between group relative">
                             <span className="text-xs font-semibold text-muted uppercase tracking-wider">Appearance</span>
-                            <button
-                                onClick={toggleMode}
-                                className="p-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all"
-                            >
-                                {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                            </button>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={toggleMode}
+                                    className="p-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+                                >
+                                    {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                                </button>
+                            </div>
                         </div>
                         <div className="space-y-2">
                             <div className="flex items-center space-x-2 text-muted">
@@ -152,6 +170,20 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Analytics
                             </MenuItem>
                         )}
+                        <MenuItem
+                            icon={<Bell size={20} />}
+                            component={<Link to="/notifications" />}
+                            active={isActive('/notifications')}
+                            suffix={
+                                unreadCount > 0 ? (
+                                    <span className="bg-primary text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-primary/30 animate-pulse">
+                                        {unreadCount}
+                                    </span>
+                                ) : undefined
+                            }
+                        >
+                            Notifications
+                        </MenuItem>
                         {canView('view_reports') && (
                             <MenuItem
                                 icon={<BarChart3 size={20} />}

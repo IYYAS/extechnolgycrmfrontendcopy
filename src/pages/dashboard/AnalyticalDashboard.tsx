@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowRight, Banknote, Briefcase, CheckCircle2,
     Circle, Clock, Globe, Layout, LayoutDashboard, LayoutGrid, Server,
-    Users, X, Zap
+    Users, X, Zap, MousePointer2, Plus
 } from 'lucide-react';
 import { getAnalyticalProjects, getServerAnalytics, getDomainAnalytics } from './dashboardService';
 import type { AnalyticalProjectsResponse, AnalyticalFilter, ServerAnalyticsResponse, DomainAnalyticsResponse } from './dashboardService';
@@ -148,6 +148,7 @@ const AnalyticalDashboard: React.FC = () => {
     const [serverData, setServerData] = useState<ServerAnalyticsResponse | null>(null);
     const [domainData, setDomainData] = useState<DomainAnalyticsResponse | null>(null);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
     const [error, setError] = useState<string | null>(null);
     const [selectedProject, setSelectedProject] = useState<any>(null);
     const [filter, setFilter] = useState<AnalyticalFilter>({ page: 1, page_size: 10, filter_type: 'this_year' });
@@ -467,6 +468,71 @@ const AnalyticalDashboard: React.FC = () => {
                                             return teamDLs.some(d => !d.isDone && d.date.getTime() < today.getTime());
                                         });
                                     }
+                                }
+
+                                if (data?.total_project_count === 0) {
+                                    return (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="max-w-4xl mx-auto py-12 px-6"
+                                        >
+                                            <div className="bg-card border border-border rounded-[2.5rem] p-12 shadow-2xl relative overflow-hidden text-center">
+                                                {/* Decorative Background Elements */}
+                                                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 blur-3xl rounded-full -mr-20 -mt-20" />
+                                                <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/10 blur-3xl rounded-full -ml-20 -mb-20" />
+
+                                                <div className="relative z-10 flex flex-col items-center">
+                                                    <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center mb-8 border border-primary/20 shadow-inner group">
+                                                        <Briefcase size={48} className="text-primary group-hover:scale-110 transition-transform duration-500" />
+                                                    </div>
+
+                                                    <h2 className="text-3xl font-black text-foreground tracking-tight mb-4 uppercase">
+                                                        No Projects Detected
+                                                    </h2>
+                                                    
+                                                    <p className="text-slate-500 text-lg max-w-xl mx-auto mb-10 font-medium">
+                                                        Your project pipeline is currently empty. To see detailed analytics and financial health, you need to create your first project.
+                                                    </p>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-3xl mb-12">
+                                                        {[
+                                                            { icon: <MousePointer2 size={18} />, title: "Step 1", desc: "Go to Projects section" },
+                                                            { icon: <Plus size={18} />, title: "Step 2", desc: "Click Create Project" },
+                                                            { icon: <Zap size={18} />, title: "Step 3", desc: "Track Financial Health" }
+                                                        ].map((step, idx) => (
+                                                            <motion.div 
+                                                                key={idx}
+                                                                initial={{ opacity: 0, y: 10 }}
+                                                                animate={{ opacity: 1, y: 0 }}
+                                                                transition={{ delay: 0.2 + (idx * 0.1) }}
+                                                                className="relative group p-6 rounded-3xl border border-border/50 transition-all duration-300 bg-muted/20 hover:border-primary/40 hover:bg-muted/40"
+                                                            >
+                                                                <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                                                                    {step.icon}
+                                                                </div>
+                                                                <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-primary opacity-80">{step.title}</p>
+                                                                <p className="text-xs font-bold text-foreground/70 uppercase tracking-tight leading-relaxed">{step.desc}</p>
+                                                            </motion.div>
+                                                        ))}
+                                                    </div>
+
+                                                    <button
+                                                        onClick={() => navigate('/projects/new')}
+                                                        className="group relative px-10 py-5 bg-primary hover:bg-primary-hover text-white font-black uppercase text-sm rounded-[2rem] transition-all shadow-xl shadow-primary/25 flex items-center gap-3 active:scale-95"
+                                                    >
+                                                        <Plus size={20} className="group-hover:scale-110 transition-transform" />
+                                                        <span>Create First Project</span>
+                                                        <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                                    </button>
+
+                                                    <p className="mt-8 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] opacity-40">
+                                                        Analytics will sync automatically after creation
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    );
                                 }
 
                                 if (results.length === 0) return (

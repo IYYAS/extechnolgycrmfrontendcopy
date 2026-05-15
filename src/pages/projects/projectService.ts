@@ -33,6 +33,7 @@ export interface ProjectFinance {
     total_invoiced: string;
     total_paid: string;
     total_balance_due: string;
+    invoice_status?: string;
 }
 
 export interface Provider {
@@ -55,6 +56,7 @@ export interface ProjectDomain {
     status: string;
     cost: string;
     payment_status: string;
+    invoice_status?: string;
 }
 
 export interface ProjectServer {
@@ -69,6 +71,20 @@ export interface ProjectServer {
     status: string;
     cost: string;
     payment_status: string;
+    invoice_status?: string;
+}
+
+export interface ProjectExbot {
+    id?: number;
+    whatsapp_number: string;
+    plan_category: string;
+    plan_active_date: string;
+    plan_deactive_date: string;
+    plan_rate: string;
+    payment_status: string;
+    status: string;
+    description: string;
+    invoice_status?: string;
 }
 
 export interface ProjectClient {
@@ -146,6 +162,11 @@ export interface ProjectTeam {
     members: ProjectTeamMemberEntry[];
     allocated_time: number;
     actual_time_spent: number;
+    invoice_status?: string;
+    payment_status?: string;
+    cost?: string | number;
+    start_date?: string;
+    end_date?: string;
     created_at?: string;
     updated_at?: string;
 }
@@ -204,6 +225,7 @@ export interface ProjectService {
     deadline: string;
     status: string;
     payment_status: string;
+    invoice_status?: string;
     project_base_informations: ProjectBaseInformation[];
     project_excutions: ProjectExecution[];
     project_finances: ProjectFinance[];
@@ -235,6 +257,7 @@ export interface Project {
     project_finances: ProjectFinance[];
     project_domains: ProjectDomain[];
     project_servers: ProjectServer[];
+    project_exbots: ProjectExbot[];
     project_clients: ProjectClient[];
     project_business_addresses: ProjectBusinessAddress[];
     project_documents?: ProjectDocument[];
@@ -248,14 +271,45 @@ export interface ProjectListResponse {
     next: string | null;
     previous: string | null;
     results: Project[];
+    stats?: {
+        total: number;
+        pending: number;
+        progressing: number;
+        completed: number;
+    };
 }
 
-export const getProjects = async (page: number = 1, search: string = ''): Promise<ProjectListResponse> => {
-    const url = search
-        ? `/projects/?page=${page}&search=${encodeURIComponent(search)}`
-        : `/projects/?page=${page}`;
+export const getProjects = async (
+    page: number = 1, 
+    search: string = '',
+    filters?: { status?: string; nature?: string; client?: string; start_date?: string; end_date?: string }
+): Promise<ProjectListResponse> => {
+    let url = `/projects/?page=${page}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (filters?.status) url += `&status=${encodeURIComponent(filters.status)}`;
+    if (filters?.nature) url += `&nature=${encodeURIComponent(filters.nature)}`;
+    if (filters?.client) url += `&client=${encodeURIComponent(filters.client)}`;
+    if (filters?.start_date) url += `&start_date=${encodeURIComponent(filters.start_date)}`;
+    if (filters?.end_date) url += `&end_date=${encodeURIComponent(filters.end_date)}`;
+    
     const response = await api.get<ProjectListResponse>(url);
     return response.data;
+};
+
+export const getClients = async (): Promise<{ company_name: string }[]> => {
+    const [businessResponse, clientResponse] = await Promise.all([
+        api.get<any>('/project-business-addresses/?page_size=100'),
+        api.get<any>('/project-clients/?page_size=100')
+    ]);
+    
+    const businessResults = businessResponse.data.results || businessResponse.data;
+    const clientResults = clientResponse.data.results || clientResponse.data;
+    
+    const businessNames = (businessResults as ProjectBusinessAddress[]).map(c => c.legal_name).filter(Boolean);
+    const clientNames = (clientResults as ProjectClient[]).map(c => c.company_name).filter(Boolean);
+    
+    const combinedNames = Array.from(new Set([...businessNames, ...clientNames]));
+    return combinedNames.sort().map(name => ({ company_name: name as string }));
 };
 
 export const getProject = async (projectId: number): Promise<Project> => {
@@ -369,16 +423,21 @@ export const deleteProject = async (projectId: number): Promise<void> => {
     await api.delete(`/projects/${projectId}/`);
 };
 
-export const getTeams = async (): Promise<TeamDetail[]> => {
-    const response = await api.get<any>('/teams/');
-    if (response.data && response.data.results) {
-        return response.data.results;
-    }
+export const getTeams = async (page: number = 1, search: string = ''): Promise<any> => {
+    const url = search
+        ? `/teams/?page=${page}&search=${encodeURIComponent(search)}`
+        : `/teams/?page=${page}`;
+    const response = await api.get<any>(url);
+    return response.data;
+};
+
+export const getTeam = async (id: number): Promise<any> => {
+    const response = await api.get<any>(`/teams/${id}/`);
     return response.data;
 };
 
 export const getProjectNatures = async (): Promise<ProjectNature[]> => {
-    const response = await api.get<any>('/project-natures/');
+    const response = await api.get<any>('/project-natures/?page_size=100');
     if (response.data && response.data.results) {
         return response.data.results;
     }
@@ -390,6 +449,11 @@ export const getAllBusinessAddresses = async (page: number = 1, search: string =
         ? `/project-business-addresses/?page=${page}&search=${encodeURIComponent(search)}`
         : `/project-business-addresses/?page=${page}`;
     const response = await api.get<BusinessAddressListResponse>(url);
+    return response.data;
+};
+
+export const getBusinessAddress = async (id: number): Promise<ProjectBusinessAddress> => {
+    const response = await api.get<ProjectBusinessAddress>(`/project-business-addresses/${id}/`);
     return response.data;
 };
 
@@ -432,17 +496,47 @@ export interface BusinessAddressSummary {
     total_paid: string | number;
     total_balance_due: string | number;
     invoice_count: number;
+    total_advance?: string | number;
+    remaining_advance?: string | number;
 }
 
 export interface BusinessAddressSummaryResponse {
     count: number;
     results: BusinessAddressSummary[];
+    statistics?: {
+        total_invoiced: number;
+        total_paid: number;
+        total_balance: number;
+    };
 }
 
-export const getAddressSummaries = async (search: string = ''): Promise<BusinessAddressSummary[]> => {
-    const url = search
-        ? `/project-business-addresses/summary/?search=${encodeURIComponent(search)}`
-        : '/project-business-addresses/summary/';
+export const getAddressSummaries = async (
+    page: number = 1,
+    search: string = '',
+    balance_status: string = 'ALL',
+    filters?: {
+        min_balance?: string;
+        max_balance?: string;
+        min_advance?: string;
+        max_advance?: string;
+        min_remaining_advance?: string;
+        max_remaining_advance?: string;
+        start_date?: string;
+        end_date?: string;
+    }
+): Promise<BusinessAddressSummaryResponse> => {
+    let url = `/project-business-addresses/summary/?page=${page}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (balance_status !== 'ALL') url += `&balance_status=${encodeURIComponent(balance_status)}`;
+    if (filters?.min_balance) url += `&min_balance=${encodeURIComponent(filters.min_balance)}`;
+    if (filters?.max_balance) url += `&max_balance=${encodeURIComponent(filters.max_balance)}`;
+    if (filters?.min_advance) url += `&min_advance=${encodeURIComponent(filters.min_advance)}`;
+    if (filters?.max_advance) url += `&max_advance=${encodeURIComponent(filters.max_advance)}`;
+    if (filters?.min_remaining_advance) url += `&min_remaining_advance=${encodeURIComponent(filters.min_remaining_advance)}`;
+    if (filters?.max_remaining_advance) url += `&max_remaining_advance=${encodeURIComponent(filters.max_remaining_advance)}`;
+    if (filters?.start_date) url += `&start_date=${encodeURIComponent(filters.start_date)}`;
+    if (filters?.end_date) url += `&end_date=${encodeURIComponent(filters.end_date)}`;
+    
     const response = await api.get<BusinessAddressSummaryResponse>(url);
-    return response.data.results;
+    return response.data;
 };

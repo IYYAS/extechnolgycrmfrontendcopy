@@ -1,11 +1,32 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { changePassword } from './userService';
+import { changePassword, getMe } from './userService';
 import { Briefcase, KeyRound, ShieldCheck, Loader2, Mail, Phone } from 'lucide-react';
+import type { User } from '../login/auth';
 
 const ProfilePage: React.FC = () => {
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const [user, setUser] = useState<User>(() => {
+        try {
+            return JSON.parse(localStorage.getItem('user') || '{}');
+        } catch {
+            return {} as User;
+        }
+    });
     const [loading, setLoading] = useState(false);
+
+    React.useEffect(() => {
+        const fetchUserData = async () => {
+            try {
+                const userData = await getMe();
+                setUser(userData);
+                localStorage.setItem('user', JSON.stringify(userData));
+            } catch (error) {
+                console.error('ProfilePage: Failed to fetch user data', error);
+            }
+        };
+        fetchUserData();
+    }, []);
+    
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     
@@ -33,8 +54,12 @@ const ProfilePage: React.FC = () => {
                 {/* User Info Sidebar */}
                 <div className="w-full md:w-1/3 space-y-6">
                     <div className="bg-card border border-border rounded-3xl p-8 text-center shadow-xl">
-                        <div className="w-24 h-24 rounded-3xl bg-primary-subtle flex items-center justify-center text-primary text-4xl font-black mx-auto mb-4 border-2 border-primary/20 shadow-inner">
-                            {user.username?.charAt(0).toUpperCase()}
+                        <div className="w-24 h-24 rounded-3xl bg-primary-subtle flex items-center justify-center text-primary text-4xl font-black mx-auto mb-4 border-2 border-primary/20 shadow-inner overflow-hidden">
+                            {user.profile_pic ? (
+                                <img src={user.profile_pic} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                user.username?.charAt(0).toUpperCase()
+                            )}
                         </div>
                         <h2 className="text-2xl font-bold text-foreground">{user.first_name} {user.last_name || user.username}</h2>
                         <p className="text-muted text-sm font-medium">{user.designation || 'Extechnology Member'}</p>
@@ -61,11 +86,17 @@ const ProfilePage: React.FC = () => {
                             <h3 className="font-bold">Active Roles</h3>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {user.roles?.map((role: any, idx: number) => (
-                                <span key={idx} className="px-3 py-1 bg-background border border-border rounded-lg text-xs font-bold text-muted">
-                                    {typeof role === 'string' ? role : role.name}
+                            {user.role ? (
+                                <span className="px-3 py-1 bg-background border border-border rounded-lg text-xs font-bold text-muted">
+                                    {user.role.name}
                                 </span>
-                            )) || 'No roles assigned'}
+                            ) : (
+                                user.roles?.map((role: any, idx: number) => (
+                                    <span key={idx} className="px-3 py-1 bg-background border border-border rounded-lg text-xs font-bold text-muted">
+                                        {typeof role === 'string' ? role : role.name}
+                                    </span>
+                                )) || 'No roles assigned'
+                            )}
                         </div>
                     </div>
                 </div>

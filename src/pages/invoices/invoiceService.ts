@@ -13,6 +13,7 @@ export interface InvoiceItem {
     project_server?: number | null;
     project_domain?: number | null;
     project_service?: number | null;
+    project_exbot?: number | null;
 }
 
 export interface Payment {
@@ -88,6 +89,12 @@ export interface InvoiceListResponse {
     next: string | null;
     previous: string | null;
     results: Invoice[];
+    statistics?: {
+        total: number;
+        paid: number;
+        partial: number;
+        unpaid: number;
+    };
 }
 
 const sanitizePayload = (obj: any): any => {
@@ -104,12 +111,28 @@ const sanitizePayload = (obj: any): any => {
     return obj === '' ? null : obj;
 };
 
-export const getInvoices = async (clientId: number, page: number = 1, search: string = ''): Promise<InvoiceListResponse> => {
+export const getInvoices = async (
+    clientId: number, 
+    page: number = 1, 
+    search: string = '',
+    filters: {
+        status?: string;
+        min_amount?: string;
+        max_amount?: string;
+        start_date?: string;
+        end_date?: string;
+    } = {}
+): Promise<InvoiceListResponse> => {
     const params = new URLSearchParams({
         page: page.toString(),
     });
 
     if (search) params.append('search', search);
+    if (filters.status) params.append('status', filters.status);
+    if (filters.min_amount) params.append('min_amount', filters.min_amount);
+    if (filters.max_amount) params.append('max_amount', filters.max_amount);
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
 
     const response = await api.get<InvoiceListResponse>(`/project-business-addresses/${clientId}/invoices/?${params.toString()}`);
     return response.data;

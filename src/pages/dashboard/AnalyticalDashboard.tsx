@@ -5,10 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     ArrowRight, Banknote, Briefcase, CheckCircle2,
     Circle, Clock, Globe, Layout, LayoutDashboard, LayoutGrid, Server,
-    Users, X, Zap, MousePointer2, Plus
+    Users, X, Zap, MousePointer2, Plus, MessageSquare
 } from 'lucide-react';
-import { getAnalyticalProjects, getServerAnalytics, getDomainAnalytics } from './dashboardService';
-import type { AnalyticalProjectsResponse, AnalyticalFilter, ServerAnalyticsResponse, DomainAnalyticsResponse } from './dashboardService';
+import { getAnalyticalProjects, getServerAnalytics, getDomainAnalytics, getExbotAnalytics } from './dashboardService';
+import type { AnalyticalProjectsResponse, AnalyticalFilter, ServerAnalyticsResponse, DomainAnalyticsResponse, ExbotAnalyticsResponse } from './dashboardService';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -22,6 +22,7 @@ import {
 import { Doughnut } from 'react-chartjs-2';
 import ServerAnalytical from './ServerAnalytical';
 import DomainAnalytical from './DomainAnalytical';
+import ExbotAnalytical from './ExbotAnalytical';
 import { usePermission } from '../../hooks/usePermission';
 
 
@@ -147,6 +148,7 @@ const AnalyticalDashboard: React.FC = () => {
     const [data, setData] = useState<AnalyticalProjectsResponse | null>(null);
     const [serverData, setServerData] = useState<ServerAnalyticsResponse | null>(null);
     const [domainData, setDomainData] = useState<DomainAnalyticsResponse | null>(null);
+    const [exbotData, setExbotData] = useState<ExbotAnalyticsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
     const [error, setError] = useState<string | null>(null);
@@ -158,6 +160,7 @@ const AnalyticalDashboard: React.FC = () => {
         { id: 'projects', label: 'Projects', permission: 'view_projectstats' },
         { id: 'servers', label: 'Servers', permission: 'view_server_stats' },
         { id: 'domains', label: 'Domains', permission: 'view_domain_stats' },
+        { id: 'exbots', label: 'Exbots', permission: 'view_exbot_stats' },
     ].filter(tab => hasPermission(tab.permission));
 
     const [activeTab, setActiveTab] = useState<'projects' | 'servers' | 'domains' | string>(availableTabs[0]?.id || 'projects');
@@ -177,14 +180,16 @@ const AnalyticalDashboard: React.FC = () => {
         try {
             setLoading(true);
             setError(null);
-            const [projRes, serverRes, domainRes] = await Promise.all([
+            const [projRes, serverRes, domainRes, exbotRes] = await Promise.all([
                 getAnalyticalProjects(filter),
                 getServerAnalytics(),
-                getDomainAnalytics()
+                getDomainAnalytics(),
+                getExbotAnalytics()
             ]);
             setData(projRes);
             setServerData(serverRes);
             setDomainData(domainRes);
+            setExbotData(exbotRes);
         } catch (e) {
             console.error(e);
             setError("Failed to sync dashboard data.");
@@ -561,6 +566,7 @@ const AnalyticalDashboard: React.FC = () => {
                                                         </th>
                                                         {hasPermission('view_server_stats') && <th className="px-5 py-4 text-center">Server</th>}
                                                         {hasPermission('view_domain_stats') && <th className="px-5 py-4 text-center">Domain</th>}
+                                                        {hasPermission('view_projectexbot') && <th className="px-5 py-4 text-center">Exbot</th>}
                                                         <th className="px-5 py-4 text-center">Services</th>
                                                         <th className="px-5 py-4 text-center pr-10">Payment Progress</th>
                                                     </tr>
@@ -653,6 +659,24 @@ const AnalyticalDashboard: React.FC = () => {
                                                                             </div>
                                                                         </td>
                                                                     )}
+                                                                    {hasPermission('view_projectexbot') && (
+                                                                        <td className="px-5 py-4">
+                                                                            <div className="flex flex-col items-center">
+                                                                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter block line-clamp-1 max-w-[80px]">
+                                                                                    {p.exbot_name || 'NO BOT'}
+                                                                                </span>
+                                                                                {(p.exbot_count || 0) > 0 && (
+                                                                                    <span className="text-[10px] font-black block mt-1">
+                                                                                        <span className={p.paid_exbot_count === p.exbot_count ? "text-emerald-500" : "text-slate-500"}>
+                                                                                            {p.paid_exbot_count || 0}
+                                                                                        </span>
+                                                                                        <span className="text-slate-400 font-medium mx-0.5">/</span>
+                                                                                        <span className="text-slate-500">{p.exbot_count}</span>
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
+                                                                        </td>
+                                                                    )}
                                                                     <td className="px-5 py-4 text-center">
                                                                         <span className="text-[10px] font-black text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/10">
                                                                             {p.serviceteam_count ?? p.services?.length ?? 0}
@@ -677,17 +701,35 @@ const AnalyticalDashboard: React.FC = () => {
                                                                             )}
                                                                         </div>
                                                                         {(() => {
-                                                                            const cats = ['project', 'domain', 'server', 'service'];
-                                                                            const activeCats = cats.filter(c => (p.category_status as any)?.[c] && (p.category_status as any)?.[c] !== 'NA');
-                                                                            if (activeCats.length === 0) return null;
-                                                                            const paidCount = activeCats.filter(c => (p.category_status as any)?.[c] === 'Paid').length;
-                                                                            const pct = Math.round((paidCount / activeCats.length) * 100);
-                                                                            const allPaid = paidCount === activeCats.length;
+                                                                            // Calculate true total based on individual items rather than categories
+                                                                            // Actually, backend total_teams_count = project_teams + service_teams. 
+                                                                            // Let's just use the direct counts available
+                                                                            const totalItems = 
+                                                                                (p.total_teams_count || 0) + 
+                                                                                (p.serviceteam_count || 0) + 
+                                                                                (p.server_count || 0) + 
+                                                                                (p.domain_count || 0) + 
+                                                                                (p.exbot_count || 0);
+
+                                                                            if (totalItems === 0) return null;
+
+                                                                            const paidServices = p.services ? p.services.filter((s: any) => s.paid_status?.toUpperCase() === 'PAID').length : 0;
+                                                                            
+                                                                            const paidItems = 
+                                                                                (p.completed_teams_count || 0) + 
+                                                                                paidServices + 
+                                                                                (p.paid_server_count || 0) + 
+                                                                                (p.paid_domain_count || 0) + 
+                                                                                (p.paid_exbot_count || 0);
+
+                                                                            const pct = Math.round((paidItems / totalItems) * 100);
+                                                                            const allPaid = paidItems === totalItems;
+                                                                            
                                                                             return (
                                                                                 <div className="w-full mt-2">
                                                                                     <div className="flex justify-between items-center mb-1">
                                                                                         <span className={`text-[8px] font-black uppercase ${allPaid ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                                                            {allPaid ? '✓ All Paid' : `${paidCount}/${activeCats.length} Paid`}
+                                                                                            {allPaid ? '✓ All Paid' : `${paidItems}/${totalItems} Paid`}
                                                                                         </span>
                                                                                         <span className={`text-[8px] font-black ${allPaid ? 'text-emerald-500' : 'text-rose-500'}`}>{pct}%</span>
                                                                                     </div>
@@ -710,7 +752,7 @@ const AnalyticalDashboard: React.FC = () => {
                                                                             exit={{ opacity: 0 }}
                                                                             className="bg-muted/5"
                                                                         >
-                                                                            <td colSpan={6 + (hasPermission('view_server_stats') ? 1 : 0) + (hasPermission('view_domain_stats') ? 1 : 0)} className="p-0">
+                                                                            <td colSpan={6 + (hasPermission('view_server_stats') ? 1 : 0) + (hasPermission('view_domain_stats') ? 1 : 0) + (hasPermission('view_projectexbot') ? 1 : 0)} className="p-0">
                                                                                 <motion.div
                                                                                     initial={{ height: 0, opacity: 0 }}
                                                                                     animate={{ height: "auto", opacity: 1 }}
@@ -763,7 +805,7 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                     const iconCfg = {
                                                                                                         project: { icon: <Briefcase size={12} />, bg: 'bg-indigo-500/10 text-indigo-400', labelCls: 'text-indigo-400' },
                                                                                                         service: { icon: <Zap size={12} />, bg: 'bg-indigo-500/10 text-indigo-400', labelCls: 'text-indigo-400' },
-                                                                                                        infra: { icon: label.includes('Server') ? <><Server size={12} /> {(p.server_count ?? 0) > 0 && <span className="text-[10px] font-black ml-1 text-slate-500 opacity-80">{p.server_count}</span>}</> : label.includes('Domain') ? <Globe size={12} /> : <Zap size={12} />, bg: 'bg-slate-500/10 text-slate-400', labelCls: 'text-slate-400' }
+                                                                                                        infra: { icon: label.includes('Server') ? <><Server size={12} /> {(p.server_count ?? 0) > 0 && <span className="text-[10px] font-black ml-1 text-slate-500 opacity-80">{p.server_count}</span>}</> : label.includes('Domain') ? <Globe size={12} /> : label.includes('Exbot') ? <MessageSquare size={12} /> : <Zap size={12} />, bg: 'bg-slate-500/10 text-slate-400', labelCls: 'text-slate-400' }
                                                                                                     }[type];
 
                                                                                                     return (
@@ -840,6 +882,19 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                                 'project'
                                                                                                             )
                                                                                                         )}
+
+                                                                                                        {/* Exbot Items */}
+                                                                                                        {(p.category_status?.exbot_items || []).map((ex: any, i: number) => (
+                                                                                                            renderExpandedRow(
+                                                                                                                `Exbot #${i + 1}`,
+                                                                                                                ex.whatsapp,
+                                                                                                                ex.cost,
+                                                                                                                ex.payment_status,
+                                                                                                                ex.deadline,
+                                                                                                                null,
+                                                                                                                'infra'
+                                                                                                            )
+                                                                                                        ))}
 
                                                                                                         {/* Service Teams */}
                                                                                                         {(p.services || []).map((svc: any) => (
@@ -946,6 +1001,9 @@ const AnalyticalDashboard: React.FC = () => {
 
                     {activeTab === 'domains' && domainData && (
                         <DomainAnalytical domainData={domainData} />
+                    )}
+                    {activeTab === 'exbots' && exbotData && (
+                        <ExbotAnalytical exbotData={exbotData} />
                     )}
                 </>
             )}

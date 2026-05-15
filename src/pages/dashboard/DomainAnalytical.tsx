@@ -91,12 +91,21 @@ const DomainAnalytical: React.FC<DomainAnalyticalProps> = ({ domainData }) => {
     }
 
     const filteredDomains = domainData.domains_list?.filter(domain => {
+        const isExpired = domain.status?.toLowerCase() !== 'active' || (domain.days_until_expiry !== null && domain.days_until_expiry !== undefined && domain.days_until_expiry < 0);
+
         if (activeFilter === 'all') return true;
-        if (activeFilter === 'active') return domain.status?.toLowerCase() === 'active';
-        if (activeFilter === 'expired') return domain.status?.toLowerCase() !== 'active';
+        if (activeFilter === 'active') return !isExpired;
+        if (activeFilter === 'expired') return isExpired;
         if (activeFilter === 'paid') return domain.payment_status?.toLowerCase() === 'paid';
         if (activeFilter === 'unpaid') return domain.payment_status?.toLowerCase() !== 'paid';
         return true;
+    }).sort((a, b) => {
+        const aDays = a.days_until_expiry ?? 9999;
+        const bDays = b.days_until_expiry ?? 9999;
+        const isExpiredA = aDays < 0;
+        const isExpiredB = bDays < 0;
+        if (isExpiredA !== isExpiredB) return isExpiredA ? 1 : -1;
+        return aDays - bDays;
     });
 
     // Donut chart for accrued by distribution (since domains don't have 'types' like servers)
@@ -323,7 +332,7 @@ const DomainAnalytical: React.FC<DomainAnalyticalProps> = ({ domainData }) => {
                                     <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${d.days_until_expiry != null && d.days_until_expiry < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
                                         {d.days_until_expiry != null
                                             ? (d.days_until_expiry < 0
-                                                ? `Overdue: ${Math.abs(d.days_until_expiry)} days`
+                                                ? 'EXPIRED'
                                                 : `${d.days_until_expiry} days left`)
                                             : 'Expires'}
                                     </p>
@@ -355,89 +364,103 @@ const DomainAnalytical: React.FC<DomainAnalyticalProps> = ({ domainData }) => {
 
                     <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <AnimatePresence mode="popLayout">
-                            {filteredDomains?.map((domain, idx) => (
-                                <motion.div
-                                    layout
-                                    key={domain.id}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    transition={{ type: 'spring', stiffness: 300, damping: 28, delay: idx * 0.05 }}
-                                    className="bg-card border border-border/50 rounded-2xl p-5 shadow-md hover:shadow-xl hover:border-border transition-all group"
-                                >
-                                    <div className="flex justify-between items-start mb-5">
-                                        <div className="min-w-0">
-                                            <p className="text-base font-black text-foreground uppercase tracking-tight truncate">{domain.domain}</p>
-                                            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-500/10 border border-slate-500/20 px-2 py-0.5 rounded mt-2 inline-block">
-                                                Domain Asset
-                                            </span>
+                            {filteredDomains?.map((domain, idx) => {
+                                const isExpired = domain.status?.toLowerCase() !== 'active' || (domain.days_until_expiry !== null && domain.days_until_expiry !== undefined && domain.days_until_expiry < 0);
+                                return (
+                                    <motion.div
+                                        layout
+                                        key={domain.id}
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        transition={{ type: 'spring', stiffness: 300, damping: 28, delay: idx * 0.05 }}
+                                        className={`bg-card border ${domain.days_until_expiry !== null && domain.days_until_expiry !== undefined && domain.days_until_expiry > 15 && domain.days_until_expiry <= 30
+                                                ? 'border-amber-500/50 shadow-amber-500/10'
+                                                : domain.days_until_expiry !== null && domain.days_until_expiry !== undefined && domain.days_until_expiry <= 15
+                                                    ? 'border-rose-500/50 shadow-rose-500/10'
+                                                    : 'border-border/50'
+                                            } rounded-2xl p-5 shadow-md hover:shadow-xl transition-all group relative overflow-hidden`}
+                                    >
+                                        {(domain.days_until_expiry !== null && domain.days_until_expiry !== undefined && domain.days_until_expiry <= 30) && (
+                                            <div className={`absolute top-0 left-0 w-full text-center py-0.5 text-[8px] font-black uppercase tracking-widest ${domain.days_until_expiry <= 15
+                                                    ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                                                    : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                                }`}>
+                                                {domain.days_until_expiry < 0 ? 'Expired' : 'Expiring Soon'}
+                                            </div>
+                                        )}
+                                        <div className={`flex justify-between items-start mb-5 ${domain.days_until_expiry !== null && domain.days_until_expiry !== undefined && domain.days_until_expiry <= 30 ? 'mt-3' : ''}`}>
+                                            <div className="min-w-0">
+                                                <p className="text-base font-black text-foreground uppercase tracking-tight truncate">{domain.domain}</p>
+                                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-500/10 border border-slate-500/20 px-2 py-0.5 rounded mt-2 inline-block">
+                                                    Domain Asset
+                                                </span>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/10 transition-colors flex-shrink-0 z-10">
+                                                <Globe size={18} className="text-indigo-400" />
+                                            </div>
                                         </div>
-                                        <div className="w-10 h-10 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/10 transition-colors flex-shrink-0">
-                                            <Globe size={18} className="text-indigo-400" />
-                                        </div>
-                                    </div>
 
-                                    <div className="space-y-2.5 text-[11px]">
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">Project</span>
-                                            {domain.project ? (
-                                                <span className="font-black text-indigo-400 uppercase flex items-center gap-1"><Layout size={9} />{domain.project}</span>
-                                            ) : (
-                                                <span className="text-slate-400 italic">—</span>
-                                            )}
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">Purchase / Expiry</span>
-                                            <div className="text-right">
-                                                <p className="font-black text-foreground">
-                                                    {domain.purchase_date ? new Date(domain.purchase_date).toLocaleDateString() : '—'} / {new Date(domain.expiration_date).toLocaleDateString()}
-                                                </p>
-                                                {domain.days_until_expiry != null && (
-                                                    <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${domain.days_until_expiry < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
-                                                        {domain.days_until_expiry < 0
-                                                            ? `Overdue: ${Math.abs(domain.days_until_expiry)} days`
-                                                            : `${domain.days_until_expiry} days left`}
-                                                    </p>
+                                        <div className="space-y-2.5 text-[11px]">
+                                            <div className="flex justify-between">
+                                                <span className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">Project</span>
+                                                {domain.project ? (
+                                                    <span className="font-black text-indigo-400 uppercase flex items-center gap-1"><Layout size={9} />{domain.project}</span>
+                                                ) : (
+                                                    <span className="text-slate-400 italic">—</span>
                                                 )}
                                             </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">Purchase / Expiry</span>
+                                                <div className="text-right">
+                                                    <p className="font-black text-foreground">
+                                                        {domain.purchase_date ? new Date(domain.purchase_date).toLocaleDateString() : '—'} / {new Date(domain.expiration_date).toLocaleDateString()}
+                                                    </p>
+                                                    {domain.days_until_expiry != null && domain.days_until_expiry >= 0 && (
+                                                        <p className="text-[9px] font-bold uppercase tracking-widest mt-0.5 text-slate-500">
+                                                            {domain.days_until_expiry} days left
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {domain.purchased_from && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">Registrar</span>
+                                                    <span className="font-black text-foreground uppercase">{domain.purchased_from}</span>
+                                                </div>
+                                            )}
+                                            {domain.accrued_by && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">Ownership</span>
+                                                    <span className="font-black text-foreground uppercase">{domain.accrued_by}</span>
+                                                </div>
+                                            )}
                                         </div>
-                                        {domain.purchased_from && (
-                                            <div className="flex justify-between">
-                                                <span className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">Registrar</span>
-                                                <span className="font-black text-foreground uppercase">{domain.purchased_from}</span>
-                                            </div>
-                                        )}
-                                        {domain.accrued_by && (
-                                            <div className="flex justify-between">
-                                                <span className="text-slate-500 font-bold uppercase tracking-widest text-[9px]">Ownership</span>
-                                                <span className="font-black text-foreground uppercase">{domain.accrued_by}</span>
-                                            </div>
-                                        )}
-                                    </div>
 
-                                    <div className="flex items-center justify-between mt-5 pt-4 border-t border-border/50">
-                                        <div className="flex gap-2">
-                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${(domain.effective_status || domain.status)?.toLowerCase() === 'active'
+                                        <div className="flex items-center justify-between mt-5 pt-4 border-t border-border/50">
+                                            <div className="flex gap-2">
+                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${!isExpired
                                                     ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                                                     : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                                                }`}>
-                                                {(domain.effective_status || domain.status || 'Active').toUpperCase()}
-                                            </span>
-                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${domain.payment_status?.toLowerCase() === 'paid'
+                                                    }`}>
+                                                    {isExpired ? 'EXPIRED' : (domain.effective_status || domain.status || 'Active').toUpperCase()}
+                                                </span>
+                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${domain.payment_status?.toLowerCase() === 'paid'
                                                     ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
                                                     : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                                                }`}>
-                                                {domain.payment_status?.toUpperCase() || 'UNPAID'}
-                                            </span>
+                                                    }`}>
+                                                    {domain.payment_status?.toUpperCase() || 'UNPAID'}
+                                                </span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-sm font-black text-foreground tabular-nums">
+                                                    {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(domain.cost || 0)}
+                                                </span>
+                                            </div>
                                         </div>
-                                        <div className="text-right">
-                                            <span className="text-sm font-black text-foreground tabular-nums">
-                                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(domain.cost || 0)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            ))}
+                                    </motion.div>
+                                );
+                            })}
                         </AnimatePresence>
                     </motion.div>
 

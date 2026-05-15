@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getInvoice, createInvoice, updateInvoice } from './invoiceService';
-import { getAllBusinessAddresses, type ProjectBusinessAddress } from '../projects/projectService';
+import SearchableBusinessAddressSelect from '../../components/SearchableBusinessAddressSelect';
 import {
     ArrowLeft,
     Save,
@@ -25,7 +25,6 @@ const InvoiceForm: React.FC = () => {
     const [loading, setLoading] = useState(isEdit);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [businessAddresses, setBusinessAddresses] = useState<ProjectBusinessAddress[]>([]);
 
     const [formData, setFormData] = useState<any>({
         client_company: '',
@@ -42,6 +41,10 @@ const InvoiceForm: React.FC = () => {
             const fetchInvoice = async () => {
                 try {
                     const data = await getInvoice(clientId, parseInt(id));
+
+                    // Prioritize clientId from URL to ensure consistency with "New" mode
+                    (data as any).client_company = clientId;
+
                     setFormData(data);
                 } catch (err) {
                     setError('Failed to load invoice data.');
@@ -51,16 +54,6 @@ const InvoiceForm: React.FC = () => {
             };
             fetchInvoice();
         }
-        
-        const fetchAddresses = async () => {
-            try {
-                const addrs = await getAllBusinessAddresses(1, '');
-                setBusinessAddresses(addrs.results);
-            } catch (err) {
-                console.error('Failed to fetch addresses:', err);
-            }
-        };
-        fetchAddresses();
 
         if (!isEdit) {
             // Handle auto-fill for new invoice
@@ -74,6 +67,7 @@ const InvoiceForm: React.FC = () => {
             const domainId = queryParams.get('domain_id');
             const serviceId = queryParams.get('service_id');
             const teamId = queryParams.get('team_id');
+            const exbotId = queryParams.get('exbot_id');
 
             if (type || name || rate || bizAddr) {
                 setFormData((prev: any) => {
@@ -97,7 +91,8 @@ const InvoiceForm: React.FC = () => {
                             project_server: serverId ? parseInt(serverId) : null,
                             project_domain: domainId ? parseInt(domainId) : null,
                             project_service: serviceId ? parseInt(serviceId) : null,
-                            project_team: teamId ? parseInt(teamId) : null
+                            project_team: teamId ? parseInt(teamId) : null,
+                            project_exbot: exbotId ? parseInt(exbotId) : null
                         }];
                     }
 
@@ -198,19 +193,10 @@ const InvoiceForm: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="space-y-1">
                         <label className={labelCls}>Client / Business Address</label>
-                        <select 
-                            value={formData.client_company || ''} 
-                            onChange={e => setFormData({ ...formData, client_company: e.target.value })} 
-                            className={inputCls}
-                            required
-                        >
-                            <option value="">Select Client</option>
-                            {businessAddresses.map(addr => (
-                                <option key={addr.id} value={addr.id}>
-                                    {addr.legal_name || addr.attention_name}{addr.city ? ` (${addr.city})` : ''}
-                                </option>
-                            ))}
-                        </select>
+                        <SearchableBusinessAddressSelect
+                            value={formData.client_company}
+                            onChange={(val) => setFormData({ ...formData, client_company: val })}
+                        />
                     </div>
                     <div className="space-y-1">
                         <label className={labelCls}>Invoice Date</label>
@@ -304,6 +290,7 @@ const InvoiceForm: React.FC = () => {
                                                 {item.project_domain && <span className="text-[10px] font-bold text-indigo-500 px-2 py-0.5 bg-indigo-500/5 rounded-lg border border-indigo-500/10">Domain: {item.project_domain}</span>}
                                                 {item.project_service && <span className="text-[10px] font-bold text-emerald-500 px-2 py-0.5 bg-emerald-500/5 rounded-lg border border-emerald-500/10">Service: {item.project_service}</span>}
                                                 {item.project_team && <span className="text-[10px] font-bold text-violet-500 px-2 py-0.5 bg-violet-500/5 rounded-lg border border-violet-500/10">Team: {item.project_team}</span>}
+                                                {item.project_exbot && <span className="text-[10px] font-bold text-emerald-500 px-2 py-0.5 bg-emerald-500/5 rounded-lg border border-emerald-500/20">Exbot: {item.project_exbot}</span>}
                                             </div>
                                             <p className="text-sm font-black text-foreground">
                                                 Amount: <span className="text-lg text-primary">₹{(Number(item.rate) * (item.quantity || 0)).toFixed(2)}</span>

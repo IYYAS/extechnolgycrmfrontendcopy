@@ -28,6 +28,11 @@ const CompanyProfileForm: React.FC = () => {
         email: '',
         phone: '',
         address: '',
+        bank_name: '',
+        account_name: '',
+        account_number: '',
+        ifsc_code: '',
+        upi_id: '',
     });
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -38,11 +43,16 @@ const CompanyProfileForm: React.FC = () => {
                 try {
                     const data = await getCompanyProfile(parseInt(id));
                     setFormData({
-                        company_name: data.company_name,
-                        company_type: data.company_type,
-                        email: data.email,
-                        phone: data.phone,
-                        address: data.address,
+                        company_name: data.company_name || '',
+                        company_type: data.company_type || '',
+                        email: data.email || '',
+                        phone: data.phone || '',
+                        address: data.address || '',
+                        bank_name: data.bank_name || '',
+                        account_name: data.account_name || '',
+                        account_number: data.account_number || '',
+                        ifsc_code: data.ifsc_code || '',
+                        upi_id: data.upi_id || '',
                     });
                     setLogoPreview(data.logo);
                 } catch (err: any) {
@@ -74,6 +84,11 @@ const CompanyProfileForm: React.FC = () => {
             fd.append('email', formData.email);
             fd.append('phone', formData.phone);
             fd.append('address', formData.address);
+            fd.append('bank_name', formData.bank_name);
+            fd.append('account_name', formData.account_name);
+            fd.append('account_number', formData.account_number);
+            fd.append('ifsc_code', formData.ifsc_code);
+            fd.append('upi_id', formData.upi_id);
             if (logoFile) {
                 fd.append('logo', logoFile);
             }
@@ -209,6 +224,63 @@ const CompanyProfileForm: React.FC = () => {
                             onChange={e => setFormData({ ...formData, address: e.target.value })}
                             className={inputCls}
                         />
+                    </div>
+                </div>
+
+                {/* Bank Details */}
+                <div className="pt-6 border-t border-border">
+                    <h3 className="text-lg font-black text-foreground mb-4">Bank Account Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className={labelCls}>Bank Name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Federal Bank"
+                                value={formData.bank_name}
+                                onChange={e => setFormData({ ...formData, bank_name: e.target.value })}
+                                className={inputCls}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className={labelCls}>Account Name</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Exmedia"
+                                value={formData.account_name}
+                                onChange={e => setFormData({ ...formData, account_name: e.target.value })}
+                                className={inputCls}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className={labelCls}>Account Number</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. 1234567890"
+                                value={formData.account_number}
+                                onChange={e => setFormData({ ...formData, account_number: e.target.value })}
+                                className={inputCls}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className={labelCls}>IFSC Code</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. FDRL0001234"
+                                value={formData.ifsc_code}
+                                onChange={e => setFormData({ ...formData, ifsc_code: e.target.value })}
+                                className={inputCls}
+                            />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                            <label className={labelCls}>UPI ID</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. exmedia@upi"
+                                value={formData.upi_id}
+                                onChange={e => setFormData({ ...formData, upi_id: e.target.value })}
+                                className={inputCls}
+                            />
+                        </div>
                     </div>
                 </div>
 

@@ -8,6 +8,11 @@ export interface CompanyProfile {
     phone: string;
     address: string;
     logo: string | null;
+    bank_name?: string;
+    account_name?: string;
+    account_number?: string;
+    ifsc_code?: string;
+    upi_id?: string;
     updated_at: string;
 }
 

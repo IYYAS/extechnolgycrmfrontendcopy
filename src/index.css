@@ -39,7 +39,8 @@
     --background: #020617;
     /* slate-950 */
     --foreground: #f8fafc;
-    --card: rgba(255, 255, 255, 0.03);
+    --card: #0f172a;
+    /* slate-900 */
     --border-color: rgba(255, 255, 255, 0.1);
     --muted: #94a3b8;
 }
@@ -77,9 +78,10 @@ body {
     color: var(--foreground);
 }
 
-/* Custom Scrollbar for modern look */
+/* Modern Scrollbar Styling */
 ::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
+    height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -87,12 +89,27 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--border-color);
-    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 20px;
+    transition: all 0.3s ease;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--muted);
+    background: var(--primary);
+}
+
+/* Specific helper for containers with scroll */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+}
+
+.dark .custom-scrollbar {
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 @keyframes fade-in {

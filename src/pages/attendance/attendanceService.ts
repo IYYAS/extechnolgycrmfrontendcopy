@@ -7,6 +7,7 @@ export interface Attendance {
     check_out: string | null;
     status: string;
     employee: number;
+    employee_name?: string;
 }
 
 export interface AttendanceListResponse {

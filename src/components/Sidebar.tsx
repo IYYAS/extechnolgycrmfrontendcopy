@@ -7,7 +7,6 @@ import {
     Server,
     FileText,
     UserCircle,
-    LogOut,
     ChevronLeft,
     Menu as MenuIcon,
     Sun,
@@ -20,14 +19,16 @@ import {
     CalendarCheck,
     DollarSign,
     Receipt,
-    UserCheck,
     BarChart3,
     Globe,
     UserCog,
     Layers,
-    Bell
+    Bell,
+    MessageSquare,
+    Target
 } from 'lucide-react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
+
+import { useLocation, Link } from 'react-router-dom';
 import { useTheme, type AccentColor } from '../context/ThemeContext';
 import { usePermission } from '../hooks/usePermission';
 import { getUnreadCount } from '../pages/notifications/notificationService';
@@ -38,43 +39,76 @@ interface SidebarProps {
 }
 
 const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) => {
-    const navigate = useNavigate();
     const location = useLocation();
     const { mode, toggleMode, accentColor, setAccentColor } = useTheme();
     const [unreadCount, setUnreadCount] = React.useState(0);
+    const [expiringServersCount, setExpiringServersCount] = React.useState(0);
+    const [expiringDomainsCount, setExpiringDomainsCount] = React.useState(0);
+    const [expiringExbotsCount, setExpiringExbotsCount] = React.useState(0);
+    const [companyName, setCompanyName] = React.useState('Extechnology');
+    const [companyLogo, setCompanyLogo] = React.useState<string | null>(null);
 
-    let user: any = {};
-    try {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) user = JSON.parse(storedUser);
-    } catch (e) {
-        console.error('Sidebar: Failed to parse user data', e);
-    }
-
-    const handleLogout = () => {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('active_role');
-        navigate('/login');
-    };
-
-    const fetchUnreadCount = async () => {
+    const fetchCounts = async () => {
         try {
             const count = await getUnreadCount();
             setUnreadCount(count);
         } catch (error) {
             console.error('Failed to fetch unread count', error);
         }
+
+        try {
+            const { getCompanyProfiles } = await import('../pages/companyProfile/companyProfileService');
+            const profiles = await getCompanyProfiles();
+            if (profiles && profiles.length > 0) {
+                setCompanyName(profiles[0].company_name);
+                setCompanyLogo(profiles[0].logo);
+            }
+        } catch (error) {
+            console.error('Failed to fetch company profile', error);
+        }
+
+        try {
+            const { getServerAnalytics, getDomainAnalytics } = await import('../pages/dashboard/dashboardService');
+            const [serverData, domainData] = await Promise.all([
+                getServerAnalytics().catch(() => null),
+                getDomainAnalytics().catch(() => null)
+            ]);
+
+            if (serverData?.servers_list) {
+                const count = serverData.servers_list.filter(s => s.days_until_expiry !== undefined && s.days_until_expiry !== null && s.days_until_expiry > 0 && s.days_until_expiry <= 30).length;
+                setExpiringServersCount(count);
+            }
+
+            if (domainData?.domains_list) {
+                const count = domainData.domains_list.filter(d => d.days_until_expiry !== undefined && d.days_until_expiry !== null && d.days_until_expiry > 0 && d.days_until_expiry <= 30).length;
+                setExpiringDomainsCount(count);
+            }
+
+            try {
+                const { getExbots } = await import('../pages/exbot/exbotService');
+                const exbotData = await getExbots(1, '');
+                if (exbotData?.results) {
+                    const { differenceInDays, parseISO } = await import('date-fns');
+                    const now = new Date();
+                    const count = exbotData.results.filter(b => {
+                        const days = differenceInDays(parseISO(b.plan_deactive_date), now);
+                        return days > 0 && days <= 30;
+                    }).length;
+                    setExpiringExbotsCount(count);
+                }
+            } catch (err) {
+                console.error('Failed to fetch exbot counts for sidebar', err);
+            }
+        } catch (error) {
+            console.error('Failed to fetch analytics for sidebar counts', error);
+        }
     };
 
     React.useEffect(() => {
-        fetchUnreadCount();
+        fetchCounts();
     }, []);
 
     const isActive = (path: string) => location.pathname === path;
-
-
 
     const { hasPermission } = usePermission();
     const canView = (permission: string | string[]) => hasPermission(permission);
@@ -103,11 +137,17 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                 {/* Header */}
                 <div className="p-6 flex items-center justify-between border-b border-white/5">
                     {!collapsed && (
-                        <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white font-bold">
-                                E
-                            </div>
-                            <span className="text-foreground font-bold text-lg tracking-tight">Extechnology</span>
+                        <div className="flex items-center space-x-3 overflow-hidden">
+                            {companyLogo ? (
+                                <div className="w-10 h-10 rounded-xl overflow-hidden border border-border shadow-sm flex-shrink-0 bg-white">
+                                    <img src={companyLogo} alt="Logo" className="w-full h-full object-contain p-1" />
+                                </div>
+                            ) : (
+                                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
+                                    {companyName.charAt(0).toUpperCase()}
+                                </div>
+                            )}
+                            <span className="text-foreground font-bold text-base tracking-tight truncate">{companyName}</span>
                         </div>
                     )}
                     <button
@@ -202,20 +242,12 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Users
                             </MenuItem>
                         )}
-                        {canView('view_employee') && (
-                            <MenuItem
-                                icon={<UserCheck size={20} />}
-                                component={<Link to="/employees" />}
-                                active={isActive('/employees')}
-                            >
-                                Employees
-                            </MenuItem>
-                        )}
-                        {canView('view_team') && (
+
+                        {(canView('view_team') || canView(['view_teamperformance', 'view_all_team_performance', 'view_own_team_performance'])) && (
                             <MenuItem
                                 icon={<Layers size={20} />}
-                                component={<Link to="/teams" />}
-                                active={isActive('/teams')}
+                                component={<Link to="/team-performance" />}
+                                active={isActive('/team-performance')}
                             >
                                 Teams
                             </MenuItem>
@@ -229,11 +261,28 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Projects
                             </MenuItem>
                         )}
+                        {canView('view_lead') && (
+                            <MenuItem
+                                icon={<Target size={20} />}
+                                component={<Link to="/leads/dashboard" />}
+                                active={location.pathname.startsWith('/leads')}
+                            >
+                                Leads
+                            </MenuItem>
+                        )}
+
                         {canView('view_projectserver') && (
                             <MenuItem
                                 icon={<Server size={20} />}
                                 component={<Link to="/infrastructure/servers" />}
                                 active={isActive('/infrastructure/servers')}
+                                suffix={
+                                    expiringServersCount > 0 ? (
+                                        <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 animate-pulse">
+                                            {expiringServersCount}
+                                        </span>
+                                    ) : undefined
+                                }
                             >
                                 Servers
                             </MenuItem>
@@ -243,8 +292,31 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 icon={<Globe size={20} />}
                                 component={<Link to="/infrastructure/domains" />}
                                 active={isActive('/infrastructure/domains')}
+                                suffix={
+                                    expiringDomainsCount > 0 ? (
+                                        <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 animate-pulse">
+                                            {expiringDomainsCount}
+                                        </span>
+                                    ) : undefined
+                                }
                             >
                                 Domains
+                            </MenuItem>
+                        )}
+                        {canView('view_projectexbot') && (
+                            <MenuItem
+                                icon={<MessageSquare size={20} />}
+                                component={<Link to="/infrastructure/exbots" />}
+                                active={isActive('/infrastructure/exbots')}
+                                suffix={
+                                    expiringExbotsCount > 0 ? (
+                                        <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 animate-pulse">
+                                            {expiringExbotsCount}
+                                        </span>
+                                    ) : undefined
+                                }
+                            >
+                                Exbots
                             </MenuItem>
                         )}
 
@@ -329,15 +401,7 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                                 Employee Performance
                             </MenuItem>
                         )}
-                        {canView(['view_teamperformance', 'view_all_team_performance', 'view_own_team_performance']) && (
-                            <MenuItem
-                                icon={<BarChart3 size={20} />}
-                                component={<Link to="/team-performance" />}
-                                active={isActive('/team-performance')}
-                            >
-                                Team Performance
-                            </MenuItem>
-                        )}
+
                         <MenuItem
                             icon={<UserCircle size={20} />}
                             component={<Link to="/profile" />}
@@ -366,23 +430,6 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                     </Menu>
                 </div>
 
-                {/* Footer */}
-                <div className="p-4 border-t border-border bg-muted/5">
-                    {!collapsed && (
-                        <div className="mb-4 px-2">
-                            <p className="text-xs font-semibold text-muted uppercase tracking-wider mb-1">Signed in as</p>
-                            <p className="text-foreground font-medium truncate">{user.username || 'User'}</p>
-                        </div>
-                    )}
-                    <Menu menuItemStyles={menuItemStyles}>
-                        <MenuItem
-                            icon={<LogOut size={20} />}
-                            onClick={handleLogout}
-                        >
-                            Logout
-                        </MenuItem>
-                    </Menu>
-                </div>
             </div>
         </Sidebar>
     );

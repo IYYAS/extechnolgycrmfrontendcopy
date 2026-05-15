@@ -59,7 +59,7 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 w-full mt-2 bg-card border border-border shadow-2xl rounded-2xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 custom-scrollbar">
+        <div className="absolute z-50 w-full mt-2 bg-card/95 backdrop-blur-xl border border-border shadow-2xl rounded-2xl max-h-60 overflow-y-auto animate-in fade-in slide-in-from-top-2 duration-200 custom-scrollbar">
           <div className="p-1">
             {filteredOptions.length > 0 ? (
               filteredOptions.map((opt) => (

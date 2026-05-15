@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getSalaries, deleteSalary, type Salary } from './salaryService';
 import { getUsers } from '../user/userService';
 import {
     Search, Plus, Loader2, Edit2, Trash2, AlertCircle,
-    ChevronLeft, ChevronRight, User, DollarSign, TrendingUp, MinusCircle,
+    User, DollarSign, TrendingUp, MinusCircle,
     Filter, Calendar, UserCheck, X
 } from 'lucide-react';
+import Pagination from '../../components/Pagination';
 
 const SalaryList: React.FC = () => {
     const [salaries, setSalaries] = useState<Salary[]>([]);
@@ -14,13 +15,22 @@ const SalaryList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [statistics, setStatistics] = useState<{
+        total_basic: number;
+        paid_count: number;
+        unpaid_count: number;
+    } | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [users, setUsers] = useState<any[]>([]);
+    const navigate = useNavigate();
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const initialEmployee = queryParams.get('employee') || '';
+
     const [filterStartDate, setFilterStartDate] = useState('');
     const [filterEndDate, setFilterEndDate] = useState('');
-    const [filterEmployee, setFilterEmployee] = useState('');
-    const [showFilters, setShowFilters] = useState(false);
-    const navigate = useNavigate();
+    const [filterEmployee, setFilterEmployee] = useState(initialEmployee);
+    const [showFilters, setShowFilters] = useState(!!initialEmployee);
 
     const ITEMS_PER_PAGE = 10;
     const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
@@ -36,6 +46,7 @@ const SalaryList: React.FC = () => {
             });
             setSalaries(salaryData.results);
             setTotalCount(salaryData.count);
+            setStatistics(salaryData.statistics || null);
         } catch (err: any) {
             setError(err.response?.data?.detail || 'Failed to load salaries.');
         } finally {
@@ -95,9 +106,7 @@ const SalaryList: React.FC = () => {
     };
 
     // Summary
-    const totalBasic = salaries.reduce((a, s) => a + parseFloat(s.basic || '0'), 0);
-    const paidCount = salaries.filter(s => s.status?.toLowerCase() === 'paid').length;
-    const unpaidCount = salaries.filter(s => s.status?.toLowerCase() === 'unpaid').length;
+
 
     if (loading && salaries.length === 0) return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -134,19 +143,19 @@ const SalaryList: React.FC = () => {
                 <div className="bg-card border border-border p-6 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-8 text-primary/5 group-hover:text-primary/10 transition-colors"><DollarSign size={80} /></div>
                     <p className="text-[10px] font-black uppercase text-muted tracking-[0.2em]">Total Basic (This View)</p>
-                    <h2 className="text-3xl font-black mt-2 text-primary">₹{totalBasic.toLocaleString()}</h2>
+                    <h2 className="text-3xl font-black mt-2 text-primary">₹{(statistics?.total_basic || 0).toLocaleString()}</h2>
                     <p className="text-xs text-muted font-bold mt-1">Gross payroll</p>
                 </div>
                 <div className="bg-card border border-border p-6 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-8 text-emerald-500/5 group-hover:text-emerald-500/10 transition-colors"><TrendingUp size={80} /></div>
                     <p className="text-[10px] font-black uppercase text-muted tracking-[0.2em]">Paid</p>
-                    <h2 className="text-4xl font-black mt-2 text-emerald-500">{paidCount}</h2>
+                    <h2 className="text-4xl font-black mt-2 text-emerald-500">{statistics?.paid_count || 0}</h2>
                     <p className="text-xs text-emerald-500 font-bold mt-1 uppercase">Records cleared</p>
                 </div>
                 <div className="bg-card border border-border p-6 rounded-[2.5rem] shadow-sm relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-8 text-rose-500/5 group-hover:text-rose-500/10 transition-colors"><MinusCircle size={80} /></div>
                     <p className="text-[10px] font-black uppercase text-muted tracking-[0.2em]">Unpaid</p>
-                    <h2 className="text-4xl font-black mt-2 text-rose-500">{unpaidCount}</h2>
+                    <h2 className="text-4xl font-black mt-2 text-rose-500">{statistics?.unpaid_count || 0}</h2>
                     <p className="text-xs text-rose-500 font-bold mt-1 uppercase">Pending disbursement</p>
                 </div>
             </div>
@@ -319,14 +328,16 @@ const SalaryList: React.FC = () => {
                     </div>
                 )}
 
-                {totalCount > ITEMS_PER_PAGE && (
-                    <div className="px-8 py-6 bg-muted/5 border-t border-border flex items-center justify-between">
-                        <p className="text-xs text-muted font-bold uppercase tracking-widest">Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount}</p>
-                        <div className="flex items-center gap-2">
-                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 hover:bg-primary/10 text-primary rounded-xl disabled:opacity-30 transition-all border border-border hover:border-primary/20"><ChevronLeft size={20} /></button>
-                            <span className="px-4 py-2 bg-primary/5 text-primary text-sm font-black rounded-xl border border-primary/20">{currentPage} / {totalPages}</span>
-                            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 hover:bg-primary/10 text-primary rounded-xl disabled:opacity-30 transition-all border border-border hover:border-primary/20"><ChevronRight size={20} /></button>
-                        </div>
+                {salaries.length > 0 && (
+                    <div className="px-8 py-4 border-t border-border bg-muted/5">
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalCount={totalCount}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            onPageChange={setCurrentPage}
+                            itemName="salary records"
+                        />
                     </div>
                 )}
             </div>

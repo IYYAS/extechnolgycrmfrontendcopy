@@ -14,6 +14,8 @@ export interface User {
   phone_number: string | null;
   designation: string | null;
   roles: Role[];
+  role?: Role;
+  profile_pic: string | null;
 }
 
 

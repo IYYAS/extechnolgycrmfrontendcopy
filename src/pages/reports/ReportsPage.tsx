@@ -202,7 +202,7 @@ const ReportsPage: React.FC = () => {
                     <p className="text-muted font-medium italic">Generating reports...</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6">
                     
                     {/* Left Col: Balance Sheet */}
                     <div className="space-y-6">
@@ -222,7 +222,7 @@ const ReportsPage: React.FC = () => {
                         </div>
                         
                         {balanceSheet && (
-                            <div className="bg-card border border-border rounded-[2.5rem] p-8 space-y-8 shadow-sm">
+                            <div className="bg-card border border-border rounded-[2.5rem] p-6 space-y-8 shadow-sm">
                                 {/* Assets */}
                                 <div>
                                     <h3 className="text-[11px] font-black uppercase text-muted tracking-[0.2em] mb-4">Assets</h3>
@@ -297,7 +297,7 @@ const ReportsPage: React.FC = () => {
                         </div>
 
                         {cashFlow && (
-                            <div className="bg-card border border-border rounded-[2.5rem] p-8 space-y-8 shadow-sm">
+                            <div className="bg-card border border-border rounded-[2.5rem] p-6 space-y-8 shadow-sm">
                                 {/* Cash In */}
                                 <div>
                                     <h3 className="text-[11px] flex items-center gap-2 font-black uppercase text-emerald-500 tracking-[0.2em] mb-4">
@@ -385,7 +385,7 @@ const ReportsPage: React.FC = () => {
                         </div>
 
                         {incomeStatement && (
-                            <div className="bg-card border border-border rounded-[2.5rem] p-8 space-y-8 shadow-sm">
+                            <div className="bg-card border border-border rounded-[2.5rem] p-6 space-y-8 shadow-sm">
                                 {/* Revenue */}
                                 <div>
                                     <h3 className="text-[11px] flex items-center gap-2 font-black uppercase text-emerald-500 tracking-[0.2em] mb-4">

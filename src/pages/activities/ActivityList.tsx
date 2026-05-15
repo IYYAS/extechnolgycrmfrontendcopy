@@ -14,12 +14,11 @@ import {
     Trash2,
     AlertCircle,
     TrendingUp,
-    ChevronLeft,
-    ChevronRight,
     Users,
     FilePlus,
     MessageSquare
 } from 'lucide-react';
+import Pagination from '../../components/Pagination';
 
 const ActivityList: React.FC = () => {
     const { hasPermission } = usePermission();
@@ -62,7 +61,7 @@ const ActivityList: React.FC = () => {
             setTotalCount(activityData.count);
             setUsers(userData.results || []);
             setProjects(projectData.results || []);
-            setTeams(teamData || []);
+            setTeams(teamData.results || []);
         } catch (err: any) {
             console.error('Failed to fetch activities:', err);
             setError(err.response?.data?.detail || 'Failed to load activities.');
@@ -266,6 +265,7 @@ const ActivityList: React.FC = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-muted/5 border-b border-border">
+                                <th className="px-4 py-5 text-[10px] font-black uppercase text-muted tracking-widest w-12 text-center">#</th>
                                 <th className="px-4 py-5 text-[10px] font-black uppercase text-muted tracking-widest whitespace-nowrap">Date</th>
                                 <th className="px-4 py-5 text-[10px] font-black uppercase text-muted tracking-widest whitespace-nowrap">Employee</th>
                                 <th className="px-4 py-5 text-[10px] font-black uppercase text-muted tracking-widest whitespace-nowrap">Project</th>
@@ -278,8 +278,13 @@ const ActivityList: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
-                            {activities.map((activity) => (
+                            {activities.map((activity, index) => (
                                 <tr key={activity.id} className="hover:bg-muted/5 transition-colors group">
+                                    <td className="px-4 py-6">
+                                        <div className="w-8 h-8 rounded-lg bg-muted/20 flex items-center justify-center text-[10px] font-black text-muted group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                                            {String((currentPage - 1) * ITEMS_PER_PAGE + index + 1).padStart(2, '0')}
+                                        </div>
+                                    </td>
                                     <td className="px-4 py-6">
                                         <div className="flex items-center gap-2">
                                             <div className="p-2 bg-primary/10 text-primary rounded-lg shadow-sm"><Calendar size={14} /></div>
@@ -388,28 +393,16 @@ const ActivityList: React.FC = () => {
                 )}
 
                 {/* Pagination */}
-                {totalCount > ITEMS_PER_PAGE && (
-                    <div className="px-8 py-6 bg-muted/5 border-t border-border flex items-center justify-between">
-                        <p className="text-xs text-muted font-bold uppercase tracking-widest">Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} reports</p>
-                        <div className="flex items-center gap-2">
-                            <button
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage(p => p - 1)}
-                                className="p-2 hover:bg-primary/10 text-primary rounded-xl disabled:opacity-30 transition-all border border-border hover:border-primary/20"
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-                            <span className="px-4 py-2 bg-primary/5 text-primary text-sm font-black rounded-xl border border-primary/20">{currentPage} / {totalPages}</span>
-                            <button
-                                disabled={currentPage === totalPages}
-                                onClick={() => setCurrentPage(p => p + 1)}
-                                className="p-2 hover:bg-primary/10 text-primary rounded-xl disabled:opacity-30 transition-all border border-border hover:border-primary/20"
-                            >
-                                <ChevronRight size={20} />
-                            </button>
-                        </div>
-                    </div>
-                )}
+                <div className="px-4">
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalCount={totalCount}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                        itemName="reports"
+                    />
+                </div>
             </div>
         </div>
     );

@@ -109,6 +109,11 @@ export interface AnalyticalProject {
     domain_expiring_soon_count?: number;
     server_name?: string;
     domain_name?: string;
+    exbot_name?: string;
+    exbot_count?: number;
+    paid_exbot_count?: number;
+    unpaid_exbot_count?: number;
+    exbot_expiring_soon_count?: number;
     services: AnalyticalService[];
     start_date?: string;
     
@@ -116,6 +121,7 @@ export interface AnalyticalProject {
     project_payment?: string;
     domain_payment?: string;
     server_payment?: string;
+    exbot_payment?: string;
     service_payment?: string;
     
     // New team dates & counts
@@ -168,6 +174,18 @@ export interface AnalyticalProject {
         service_total_cost?: number;
         service_paid_cost?: number;
         service_unpaid_cost?: number;
+
+        exbot: string;
+        exbot_total_cost?: number;
+        exbot_paid_cost?: number;
+        exbot_unpaid_cost?: number;
+        exbot_deadline?: string;
+        exbot_items?: Array<{
+            whatsapp: string;
+            cost: number;
+            payment_status: string;
+            deadline: string;
+        }>;
     };
     
     completed_teams_count?: number;
@@ -336,5 +354,46 @@ export const getServerAnalytics = async (): Promise<ServerAnalyticsResponse> => 
 
 export const getDomainAnalytics = async (): Promise<DomainAnalyticsResponse> => {
     const response = await api.get<DomainAnalyticsResponse>('/analytical/domains/');
+    return response.data;
+};
+
+export interface ExbotOverview {
+    total_exbots: number;
+    active_exbots: number;
+    expired_exbots: number;
+    expiring_soon_count: number;
+    paid_exbots: number;
+    unpaid_exbots: number;
+    total_cost: number;
+}
+
+export interface ExbotByCategory {
+    plan_category: string;
+    count: number;
+}
+
+export interface ExbotListExbot {
+    id: number;
+    whatsapp_number: string;
+    plan_category: string;
+    active_date: string;
+    deactive_date: string;
+    project: string | null;
+    payment_status: string;
+    status: string;
+    plan_rate: number;
+    days_until_expiry: number | null;
+    description: string | null;
+}
+
+export interface ExbotAnalyticsResponse {
+    overview: ExbotOverview;
+    by_category: ExbotByCategory[];
+    expiring_soon: ExbotListExbot[];
+    exbots_list?: ExbotListExbot[];
+}
+
+export const getExbotAnalytics = async (): Promise<ExbotAnalyticsResponse> => {
+    const response = await api.get<ExbotAnalyticsResponse>('/analytical/exbots/');
     return response.data;
 };

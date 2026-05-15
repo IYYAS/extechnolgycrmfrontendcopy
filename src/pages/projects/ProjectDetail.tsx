@@ -22,7 +22,8 @@ import {
     Trash2,
     FileText,
     Receipt,
-    ClipboardList
+    ClipboardList,
+    Bot
 } from 'lucide-react';
 
 const ProjectDetail: React.FC = () => {
@@ -88,7 +89,7 @@ const ProjectDetail: React.FC = () => {
         }
     };
 
-    const handleBillItem = (type: string, name: string, cost: string | number, purchaseDate: string = '', expiryDate: string = '') => {
+    const handleBillItem = (type: string, name: string, cost: string | number, purchaseDate: string = '', expiryDate: string = '', entityId?: number) => {
         const busAddr = project.project_business_addresses?.[0]?.id || '';
         const params = new URLSearchParams({
             type,
@@ -97,6 +98,13 @@ const ProjectDetail: React.FC = () => {
             purchase_date: purchaseDate,
             expiry_date: expiryDate
         });
+        if (entityId) {
+            if (type === 'server') params.append('server_id', entityId.toString());
+            else if (type === 'domain') params.append('domain_id', entityId.toString());
+            else if (type === 'service') params.append('service_id', entityId.toString());
+            else if (type === 'exbot') params.append('exbot_id', entityId.toString());
+            else if (type === 'finance') params.append('finance_id', entityId.toString());
+        }
         const url = busAddr
             ? `/invoices/client/${busAddr}/new?${params.toString()}`
             : `/invoices/new?${params.toString()}`;
@@ -201,10 +209,33 @@ const ProjectDetail: React.FC = () => {
                             <div className="md:col-span-1 flex flex-col justify-center">
                                 <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Ph #{idx + 1}</span>
                             </div>
-                            <div><p className="text-[10px] uppercase font-bold text-muted tracking-wider">Total Cost</p><p className="text-lg font-black text-foreground">₹{fin.project_cost || '0.00'}</p></div>
-                            <div><p className="text-[10px] uppercase font-bold text-muted tracking-wider">Paid Amount</p><p className="text-lg font-black text-emerald-500">₹{fin.total_paid || '0.00'}</p></div>
-                            <div><p className="text-[10px] uppercase font-bold text-muted tracking-wider">Balance Due</p><p className="text-lg font-black text-rose-500">₹{fin.total_balance_due || '0.00'}</p></div>
+                            <div><p className="text-[10px] uppercase font-bold text-muted tracking-wider">Total Budget</p><p className="text-lg font-black text-foreground">₹{fin.project_cost || '0.00'}</p></div>
                             <div><p className="text-[10px] uppercase font-bold text-muted tracking-wider">Manpower</p><p className="text-lg font-black text-primary">₹{fin.manpower_cost || '0.00'}</p></div>
+                            <div className="flex flex-col justify-center gap-2">
+                                <p className="text-[10px] uppercase font-bold text-muted tracking-widest">Billing</p>
+                                <div className="flex items-center gap-2">
+                                    {fin.invoice_status === 'INVOICED' ? (
+                                        <div className="flex items-center gap-1.5 text-indigo-500 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20" title="Phase has been invoiced">
+                                            <Receipt size={12} />
+                                            <span className="text-[10px] font-black uppercase tracking-wider">Invoiced</span>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-center gap-1.5 text-rose-500 bg-rose-500/5 px-3 py-1 rounded-full border border-rose-500/10" title="Phase not yet invoiced">
+                                                <Clock size={12} />
+                                                <span className="text-[10px] font-black uppercase tracking-wider">Not Invoiced</span>
+                                            </div>
+                                            <button
+                                                onClick={() => handleBillItem('finance', `Finance Phase #${idx + 1}`, fin.project_cost || 0, '', '', fin.id)}
+                                                className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
+                                                title="Generate Invoice"
+                                            >
+                                                <Receipt size={14} />
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     ))}
                     {project.project_finances?.length === 0 && <p className="text-muted text-sm text-center">No financial data available.</p>}
@@ -408,13 +439,15 @@ const ProjectDetail: React.FC = () => {
                                         <p className="text-[10px] uppercase font-bold text-emerald-500 tracking-widest">Payment</p>
                                         <div className="flex items-center gap-2">
                                             <p className="text-sm font-black text-emerald-500">{server.payment_status || 'UNPAID'}</p>
-                                            <button
-                                                onClick={() => handleBillItem('server', server.name || 'Server', server.cost || 0, server.purchase_date, server.expiration_date)}
-                                                className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
-                                                title="Generate Invoice"
-                                            >
-                                                <Receipt size={14} />
-                                            </button>
+                                            {server.accrued_by === 'Extechnology' && (
+                                                <button
+                                                    onClick={() => handleBillItem('server', server.name || 'Server', server.cost || 0, server.purchase_date, server.expiration_date, server.id)}
+                                                    className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
+                                                    title="Generate Invoice"
+                                                >
+                                                    <Receipt size={14} />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -451,13 +484,15 @@ const ProjectDetail: React.FC = () => {
                                         <p className="text-[10px] uppercase font-bold text-emerald-500 tracking-widest">Payment</p>
                                         <div className="flex items-center gap-2">
                                             <p className="text-sm font-black text-emerald-500">{domain.payment_status || 'UNPAID'}</p>
-                                            <button
-                                                onClick={() => handleBillItem('domain', domain.name || 'Domain', domain.cost || 0, domain.purchase_date, domain.expiration_date)}
-                                                className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
-                                                title="Generate Invoice"
-                                            >
-                                                <Receipt size={14} />
-                                            </button>
+                                            {domain.accrued_by === 'Extechnology' && (
+                                                <button
+                                                    onClick={() => handleBillItem('domain', domain.name || 'Domain', domain.cost || 0, domain.purchase_date, domain.expiration_date, domain.id)}
+                                                    className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
+                                                    title="Generate Invoice"
+                                                >
+                                                    <Receipt size={14} />
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -472,6 +507,46 @@ const ProjectDetail: React.FC = () => {
                         ))}
                     </div>
                 ) : <p className="text-muted text-sm text-center py-4">No domains configured.</p>}
+            </CollapsibleSection>
+
+            {/* Exbots */}
+            <CollapsibleSection title="Exbots" icon={<Bot size={20} />} iconColor="text-emerald-500" bgColor="bg-emerald-500/10" fullWidth>
+                {project.project_exbots && project.project_exbots.length > 0 ? (
+                    <div className="space-y-6">
+                        {project.project_exbots.map((exbot) => (
+                            <div key={exbot.id} className="p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/20 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-base font-black text-foreground">{exbot.whatsapp_number}</p>
+                                    <span className={`text-[10px] font-black uppercase ${exbot.status === 'Active' ? 'text-emerald-500' : 'text-rose-500'}`}>{exbot.status}</span>
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                    <div><p className="text-[10px] uppercase font-bold text-muted tracking-widest">Plan Category</p><p className="text-sm font-bold text-foreground mt-0.5">{exbot.plan_category || '—'}</p></div>
+                                    <div><p className="text-[10px] uppercase font-bold text-muted tracking-widest">Rate</p><p className="text-sm font-black text-emerald-500 mt-0.5">₹{exbot.plan_rate}</p></div>
+                                    <div><p className="text-[10px] uppercase font-bold text-muted tracking-widest">Active Date</p><p className="text-sm font-bold text-foreground mt-0.5">{exbot.plan_active_date || '—'}</p></div>
+                                    <div><p className="text-[10px] uppercase font-bold text-muted tracking-widest">Deactive Date</p><p className="text-sm font-bold text-foreground mt-0.5">{exbot.plan_deactive_date || '—'}</p></div>
+                                    <div className="flex flex-col gap-1">
+                                        <p className="text-[10px] uppercase font-bold text-emerald-500 tracking-widest">Payment</p>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-black text-emerald-500">{exbot.payment_status || 'UNPAID'}</p>
+                                            <button
+                                                onClick={() => handleBillItem('exbot', `Exbot: ${exbot.whatsapp_number}`, exbot.plan_rate || 0, exbot.plan_active_date, exbot.plan_deactive_date, exbot.id)}
+                                                className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
+                                                title="Generate Invoice"
+                                            >
+                                                <Receipt size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                {exbot.description && (
+                                    <div className="pt-3 border-t border-border/30 text-xs text-muted italic">
+                                        "{exbot.description}"
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ) : <p className="text-muted text-sm text-center py-4">No exbots configured.</p>}
             </CollapsibleSection>
 
             {/* Services */}
@@ -514,7 +589,13 @@ const CollapsibleSection: React.FC<{
     );
 };
 
-const ServiceCard: React.FC<{ service: any, projectId?: number, getStatusStyles: (s: string) => string, onBill?: (type: string, name: string, cost: string | number) => void, onAddActivity?: () => void }> = ({ service, projectId, getStatusStyles, onBill, onAddActivity }) => {
+const ServiceCard: React.FC<{
+    service: any,
+    projectId?: number,
+    getStatusStyles: (s: string) => string,
+    onBill?: (type: string, name: string, cost: string | number, purchaseDate?: string, expiryDate?: string, entityId?: number) => void,
+    onAddActivity?: () => void
+}> = ({ service, projectId, getStatusStyles, onBill, onAddActivity }) => {
     const navigate = useNavigate();
     const [expanded, setExpanded] = useState(false);
     return (
@@ -528,7 +609,7 @@ const ServiceCard: React.FC<{ service: any, projectId?: number, getStatusStyles:
                         <div className="flex items-center gap-1.5">
                             <span className="text-[11px] px-3 py-1 rounded-full font-bold uppercase border bg-emerald-500/10 text-emerald-500 border-emerald-500/20">{service.payment_status || 'UNPAID'}</span>
                             <button
-                                onClick={(e) => { e.stopPropagation(); onBill?.('service', service.name || 'Service', service.project_finances?.[0]?.project_cost || 0); }}
+                                onClick={(e) => { e.stopPropagation(); onBill?.('service', service.name || 'Service', service.project_finances?.[0]?.project_cost || 0, service.start_date, service.deadline, service.id); }}
                                 className="p-1 px-2.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20 flex items-center gap-1.5"
                                 title="Generate Invoice"
                             >

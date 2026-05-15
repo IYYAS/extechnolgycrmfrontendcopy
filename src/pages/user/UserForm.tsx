@@ -27,15 +27,20 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
     const [roleLoading, setRoleLoading] = useState(false);
     const isEdit = !!id || !!initialUser;
     const loggedInUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const isSuperAdmin = loggedInUser.is_superuser || loggedInUser.roles?.some((role: any) =>
-        typeof role === 'string' ? role === 'SuperAdmin' : role.name === 'SuperAdmin'
-    );
+    const isSuperAdmin = loggedInUser.is_superuser || 
+        loggedInUser.roles?.some((role: any) =>
+            typeof role === 'string' ? role === 'SuperAdmin' : role.name === 'SuperAdmin'
+        ) ||
+        loggedInUser.role?.name === 'SuperAdmin';
 
     const { register, handleSubmit, setValue, watch, reset } = useForm<any>({
         defaultValues: {
             role_id: null
         }
     });
+
+    const [profilePicPreview, setProfilePicPreview] = useState<string | null>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     useEffect(() => {
         if (id && !initialUser) {
@@ -44,6 +49,7 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                 try {
                     const data = await getUser(parseInt(id));
                     setUser(data);
+                    if (data.profile_pic) setProfilePicPreview(data.profile_pic);
                     reset({
                         username: data.username,
                         email: data.email,
@@ -51,7 +57,7 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                         last_name: data.last_name,
                         phone_number: data.phone_number || '',
                         designation: data.designation || '',
-                        role_id: data.roles?.[0]?.id || null
+                        role_id: data.roles?.[0]?.id || data.role?.id || null
                     } as any);
                 } catch (error) {
                     console.error('Failed to fetch user for editing:', error);
@@ -62,6 +68,7 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
             };
             fetchUser();
         } else if (initialUser) {
+            if (initialUser.profile_pic) setProfilePicPreview(initialUser.profile_pic);
             reset({
                 username: initialUser.username,
                 email: initialUser.email,
@@ -69,12 +76,24 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                 last_name: initialUser.last_name,
                 phone_number: initialUser.phone_number || '',
                 designation: initialUser.designation || '',
-                role_id: initialUser.roles?.[0]?.id || null
+                role_id: initialUser.roles?.[0]?.id || (initialUser as any).role?.id || null
             } as any);
         }
     }, [id, initialUser, reset, navigate]);
     const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
     const selectedRoleId = watch('role_id');
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setSelectedFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProfilePicPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     useEffect(() => {
         const fetchRoles = async () => {
@@ -98,10 +117,24 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
         setLoading(true);
         setError(null);
         try {
+            const formData = new FormData();
+            Object.keys(data).forEach(key => {
+                if (data[key] !== null && data[key] !== undefined) {
+                    formData.append(key, data[key]);
+                }
+            });
+            if (selectedFile) {
+                formData.append('profile_pic', selectedFile);
+            }
+
+            if (!isEdit) {
+                formData.append('password', 'defaultPassword123');
+            }
+
             if (isEdit && user) {
-                await updateUser(user.id, data);
+                await updateUser(user.id, formData);
             } else {
-                await createUser({ ...data, password: 'defaultPassword123' });
+                await createUser(formData);
             }
             if (onSuccess) onSuccess();
             navigate('/users');
@@ -200,6 +233,38 @@ const UserForm: React.FC<UserFormProps> = ({ user: initialUser, onSuccess }) => 
                 </div>
 
                 <form onSubmit={handleSubmit(onSubmit)} className="p-8 space-y-8">
+                    {/* Profile Picture Upload */}
+                    <div className="flex flex-col items-center justify-center space-y-4 pb-4">
+                        <div className="relative group">
+                            <div className="w-24 h-24 rounded-3xl bg-primary/10 border-2 border-dashed border-primary/20 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary/50 group-hover:bg-primary/5 shadow-inner">
+                                {profilePicPreview ? (
+                                    <img src={profilePicPreview} alt="Profile Preview" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="flex flex-col items-center text-primary/40 group-hover:text-primary transition-colors">
+                                        <Plus size={24} />
+                                        <span className="text-[10px] font-black uppercase mt-1">Photo</span>
+                                    </div>
+                                )}
+                            </div>
+                            <input
+                                type="file"
+                                onChange={handleFileChange}
+                                accept="image/*"
+                                className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                            />
+                            {profilePicPreview && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setSelectedFile(null); setProfilePicPreview(null); }}
+                                    className="absolute -top-2 -right-2 p-1.5 bg-rose-500 text-white rounded-xl shadow-lg hover:bg-rose-600 transition-all z-20 scale-0 group-hover:scale-100"
+                                >
+                                    <X size={12} />
+                                </button>
+                            )}
+                        </div>
+                        <p className="text-[10px] font-black text-muted uppercase tracking-widest">Click to upload profile picture</p>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         {/* Form Fields */}
                         <div className="space-y-6">

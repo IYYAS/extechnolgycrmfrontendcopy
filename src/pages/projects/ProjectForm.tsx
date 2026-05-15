@@ -1,16 +1,165 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { usePermission } from '../../hooks/usePermission';
-import { getProject, createProject, updateProject, getTeams, getProjectNatures, createProjectNature, deleteProjectNature, getAllBusinessAddresses } from './projectService';
-import type { TeamDetail, ProjectNature, ProjectBusinessAddress } from './projectService';
+import { getProject, createProject, updateProject, getTeams, getTeam, getAllBusinessAddresses, createProjectNature, deleteProjectNature } from './projectService';
+import { createInvoice } from '../invoices/invoiceService';
+import type { TeamDetail, ProjectBusinessAddress } from './projectService';
 import { getUsers } from '../user/userService';
 import type { User } from '../user/userService';
 import {
     ArrowLeft, Save, Plus, Trash2, Calendar, Briefcase, DollarSign,
-    MapPin, Server, Users, Layers, Loader2, ChevronDown, X, ChevronRight, FileText, Search, Receipt, RefreshCcw
+    MapPin, Server, Users, Layers, Loader2, ChevronDown, X, ChevronRight, FileText, Search, Receipt, RefreshCcw, Clock
 } from 'lucide-react';
 import ProviderSelect from '../../components/ProviderSelect';
 import QuickTeamModal from './QuickTeamModal';
+import SearchableUserSelect from '../../components/SearchableUserSelect';
+import SearchableTeamSelect from '../../components/SearchableTeamSelect';
+import SearchableNatureSelect from '../../components/SearchableNatureSelect';
+
+const inputCls = "w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all";
+const smallInputCls = "w-full px-3 py-2.5 bg-background border border-border rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all";
+const labelCls = "text-[11px] font-bold text-muted uppercase tracking-widest mb-1.5 block";
+
+interface BillingPreviewModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    onSkip: () => void;
+    items: any[];
+    onUpdateItem: (idx: number, field: string, value: any) => void;
+    onAddItem: () => void;
+}
+
+const BillingPreviewModal: React.FC<BillingPreviewModalProps> = ({ isOpen, onClose, onConfirm, onSkip, items, onUpdateItem, onAddItem }) => {
+    if (!isOpen) return null;
+    const grandTotal = items.reduce((sum, item) => sum + parseFloat(item.rate || 0), 0);
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-background/80 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="bg-card border border-border w-full max-w-5xl rounded-[3rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.2)] overflow-hidden animate-in zoom-in slide-in-from-bottom-8 duration-500">
+                <div className="px-10 py-8 border-b border-border flex items-center justify-between bg-gradient-to-r from-primary/5 to-transparent">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-primary text-white rounded-2xl shadow-lg shadow-primary/20"><Receipt size={24} /></div>
+                        <div>
+                            <h3 className="text-2xl font-black italic uppercase tracking-tight text-foreground">Consolidated Invoice Preview</h3>
+                            <p className="text-[10px] text-muted font-bold uppercase tracking-[0.2em] mt-0.5">Formal Invoice Breakdown</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-muted hover:text-foreground p-3 rounded-2xl hover:bg-muted/10 transition-all">
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="p-10 max-h-[65vh] overflow-y-auto custom-scrollbar">
+                    <div className="bg-white border border-border shadow-sm overflow-hidden">
+                        <table className="w-full text-left border-collapse table-fixed">
+                            <thead className="bg-[#f5f5f5] border-y border-border">
+                                <tr>
+                                    <th className="w-1/4 px-4 py-3 text-[11px] font-bold uppercase text-foreground border-r border-border">Service / Item</th>
+                                    <th className="w-1/4 px-4 py-3 text-[11px] font-bold uppercase text-foreground border-r border-border">Description</th>
+                                    <th className="w-1/6 px-4 py-3 text-[11px] font-bold uppercase text-foreground border-r border-border text-center">Period</th>
+                                    <th className="w-32 px-4 py-3 text-[11px] font-bold uppercase text-foreground border-r border-border text-right">Rate</th>
+                                    <th className="w-16 px-4 py-3 text-[11px] font-bold uppercase text-foreground border-r border-border text-center">Qty</th>
+                                    <th className="w-36 px-4 py-3 text-[11px] font-bold uppercase text-foreground text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {items.map((item, idx) => (
+                                    <tr key={idx} className="group hover:bg-muted/5 transition-colors">
+                                        <td className="px-4 py-6 border-r border-border align-top">
+                                            <input
+                                                type="text"
+                                                value={item.service_type}
+                                                onChange={e => onUpdateItem(idx, 'service_type', e.target.value)}
+                                                className="w-full bg-transparent border-none p-0 text-sm font-medium text-foreground focus:ring-0"
+                                            />
+                                        </td>
+                                        <td className="px-4 py-6 border-r border-border align-top">
+                                            <textarea
+                                                value={item.description}
+                                                rows={3}
+                                                onChange={e => onUpdateItem(idx, 'description', e.target.value)}
+                                                className="w-full bg-transparent border-none p-0 text-xs font-medium text-muted focus:ring-0 resize-none overflow-hidden leading-relaxed"
+                                                placeholder="Service description..."
+                                            />
+                                        </td>
+                                        <td className="px-4 py-6 border-r border-border align-top">
+                                            <div className="flex flex-col gap-2">
+                                                <input
+                                                    type="date"
+                                                    value={item.purchase_date || ''}
+                                                    onChange={e => onUpdateItem(idx, 'purchase_date', e.target.value)}
+                                                    className="bg-transparent border-none p-0 text-[10px] font-bold text-muted focus:ring-0 text-center w-full"
+                                                />
+                                                <div className="text-[10px] text-muted/30 text-center h-px bg-border/50 mx-4" />
+                                                <input
+                                                    type="date"
+                                                    value={item.expairy_date || ''}
+                                                    onChange={e => onUpdateItem(idx, 'expairy_date', e.target.value)}
+                                                    className="bg-transparent border-none p-0 text-[10px] font-bold text-muted focus:ring-0 text-center w-full"
+                                                />
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-6 border-r border-border align-top text-right">
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={item.rate}
+                                                onChange={e => onUpdateItem(idx, 'rate', e.target.value)}
+                                                className="w-full bg-transparent border-none p-0 text-sm font-medium text-foreground text-right focus:ring-0"
+                                            />
+                                        </td>
+                                        <td className="px-4 py-6 border-r border-border align-top text-center text-sm font-medium text-muted">1</td>
+                                        <td className="px-4 py-6 align-top text-right text-sm font-bold text-foreground">
+                                            {parseFloat(item.rate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                    </tr>
+                                ))}
+                                <tr className="bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer" onClick={onAddItem}>
+                                    <td colSpan={6} className="px-4 py-4 text-center">
+                                        <div className="flex items-center justify-center gap-2 text-primary font-black uppercase text-[10px] tracking-widest">
+                                            <Plus size={14} />
+                                            Add New Custom Item
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                            <tfoot className="border-t border-border">
+                                <tr className="bg-muted/5">
+                                    <td colSpan={4} className="px-4 py-3 text-right text-[11px] font-bold uppercase text-muted">Total :</td>
+                                    <td colSpan={2} className="px-4 py-3 text-right text-sm font-bold">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                </tr>
+                                <tr className="bg-muted/5">
+                                    <td colSpan={4} className="px-4 py-3 text-right text-[11px] font-bold uppercase text-muted">Advance :</td>
+                                    <td colSpan={2} className="px-4 py-3 text-right text-sm font-bold">0.00</td>
+                                </tr>
+                                <tr className="bg-muted/10">
+                                    <td colSpan={4} className="px-4 py-3 text-right text-[11px] font-bold uppercase text-foreground">Amount Due (INR) :</td>
+                                    <td colSpan={2} className="px-4 py-3 text-right text-base font-black border-t border-foreground/20">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+
+                <div className="px-10 py-8 border-t border-border bg-background/50 backdrop-blur-sm flex flex-col sm:flex-row items-center justify-between gap-6">
+                    <button onClick={onSkip} className="text-xs font-black uppercase text-rose-500 hover:bg-rose-500/10 px-6 py-3 rounded-2xl transition-all tracking-widest">
+                        Save project only
+                    </button>
+                    <div className="flex items-center gap-4 w-full sm:w-auto">
+                        <button onClick={onClose} className="flex-1 sm:flex-none px-8 py-4 bg-muted/10 text-muted font-bold rounded-2xl border border-transparent hover:border-border hover:bg-muted/20 transition-all text-sm">
+                            Cancel
+                        </button>
+                        <button onClick={onConfirm} className="flex-1 sm:flex-none px-12 py-4 bg-emerald-500 text-white font-black rounded-2xl shadow-2xl shadow-emerald-500/30 hover:shadow-emerald-500/50 transition-all flex items-center justify-center gap-3 text-sm active:scale-95 uppercase italic tracking-wider">
+                            <Receipt size={22} />
+                            Generate Invoice
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // ─── Reusable Collapsible Form Section ──────────────────────────────────────
 interface FormSectionProps {
@@ -63,7 +212,7 @@ const ServiceSubSection: React.FC<{
 }> = ({ title, icon, iconColor, bgColor, children, defaultOpen = false }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     return (
-        <div className={`rounded-[2rem] overflow-hidden transition-all duration-300 ${isOpen ? 'bg-background shadow-md border border-border/50' : 'bg-muted/5 border border-transparent'}`}>
+        <div className={`rounded-[2rem] transition-all duration-300 ${isOpen ? 'bg-background shadow-md border border-border/50' : 'bg-muted/5 border border-transparent'}`}>
             <div
                 onClick={() => setIsOpen(!isOpen)}
                 className="p-5 flex items-center justify-between cursor-pointer hover:bg-muted/10 transition-colors"
@@ -109,7 +258,7 @@ const ServiceFormCard: React.FC<{
         const [isExpanded, setIsExpanded] = useState(true);
 
         return (
-            <div className={`border border-border rounded-[2rem] transition-all overflow-hidden ${isExpanded ? 'bg-background shadow-lg' : 'bg-muted/5'}`}>
+            <div className={`border border-border rounded-[2rem] transition-all ${isExpanded ? 'bg-background shadow-lg' : 'bg-muted/5'}`}>
                 <div
                     className="p-6 flex items-center gap-4 cursor-pointer hover:bg-muted/10 transition-colors"
                     onClick={() => setIsExpanded(!isExpanded)}
@@ -136,7 +285,20 @@ const ServiceFormCard: React.FC<{
                                 </select>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[10px] text-emerald-500 font-bold block uppercase tracking-wider">Payment Status</label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className={`${labelCls} text-emerald-500 !mb-0`}>Payment Status</label>
+                                    {service.invoice_status === 'INVOICED' ? (
+                                        <div className="flex items-center gap-1 text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20" title="Item has been invoiced">
+                                            <FileText size={12} />
+                                            <span className="text-[9px] font-black uppercase">Invoiced</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1 text-rose-500 bg-rose-500/5 px-2 py-0.5 rounded-md border border-rose-500/10" title="Item not yet invoiced">
+                                            <X size={12} />
+                                            <span className="text-[9px] font-black uppercase">Not Invoiced</span>
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="flex items-center gap-2">
                                     <select value={service.payment_status || 'UNPAID'}
                                         disabled={!hasPermission('change_projectservice')}
@@ -146,49 +308,51 @@ const ServiceFormCard: React.FC<{
                                         <option value="PARTIAL">PARTIAL</option>
                                         <option value="PAID">PAID</option>
                                     </select>
-                                    <button
-                                        type="button"
-                                        disabled={!hasPermission('change_projectservice')}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (!service.id) {
-                                                alert('Please save the project first to generate a bill for this service.');
-                                                return;
-                                            }
-                                            onBill?.('service', service.name || 'Service', service.cost || 0, '', '', service.id);
-                                        }}
-                                        className="h-[46px] px-3 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2"
-                                        title="Generate Invoice"
-                                    >
-                                        <DollarSign size={18} />
-                                    <span className="text-[10px] font-black uppercase">Bill</span>
-                                </button>
+                                    {service.invoice_status !== 'INVOICED' && (
+                                        <button
+                                            type="button"
+                                            disabled={!hasPermission('change_projectservice')}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (!service.id) {
+                                                    alert('Please save the project first to generate a bill for this service.');
+                                                    return;
+                                                }
+                                                onBill?.('service', service.name || 'Service', service.cost || 0, '', '', service.id);
+                                            }}
+                                            className="h-[46px] px-3 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2"
+                                            title="Generate Invoice"
+                                        >
+                                            <DollarSign size={18} />
+                                            <span className="text-[10px] font-black uppercase">Bill</span>
+                                        </button>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] text-emerald-500 font-bold block uppercase tracking-wider">Cost (₹)</label>
-                            <input type="number" step="0.01" placeholder="0.00"
-                                disabled={!hasPermission('change_projectservice')}
-                                value={service.cost || ''}
-                                onChange={e => setServiceField(sIdx, 'cost', e.target.value)}
-                                className={`${smallInputCls} w-full h-[46px] text-emerald-500 font-bold`} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] text-rose-500 font-bold block uppercase tracking-wider">Deadline</label>
-                            <input type="date"
-                                disabled={!hasPermission('change_projectservice')}
-                                value={service.deadline || ''}
-                                onChange={e => setServiceField(sIdx, 'deadline', e.target.value)}
-                                className={`${smallInputCls} w-full h-[42px] text-rose-500 font-bold`} />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] text-emerald-500 font-bold block uppercase tracking-wider">Actual End Date</label>
-                            <input type="date"
-                                disabled={!hasPermission('change_projectservice')}
-                                value={service.actual_end_date || ''}
-                                onChange={e => setServiceField(sIdx, 'actual_end_date', e.target.value)}
-                                className={`${smallInputCls} w-full h-[42px] text-emerald-500 font-bold`} />
-                        </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-emerald-500 font-bold block uppercase tracking-wider">Cost (₹)</label>
+                                <input type="number" step="0.01" placeholder="0.00"
+                                    disabled={!hasPermission('change_projectservice')}
+                                    value={service.cost || ''}
+                                    onChange={e => setServiceField(sIdx, 'cost', e.target.value)}
+                                    className={`${smallInputCls} w-full h-[46px] text-emerald-500 font-bold`} />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-rose-500 font-bold block uppercase tracking-wider">Deadline</label>
+                                <input type="date"
+                                    disabled={!hasPermission('change_projectservice')}
+                                    value={service.deadline || ''}
+                                    onChange={e => setServiceField(sIdx, 'deadline', e.target.value)}
+                                    className={`${smallInputCls} w-full h-[42px] text-rose-500 font-bold`} />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-emerald-500 font-bold block uppercase tracking-wider">Actual End Date</label>
+                                <input type="date"
+                                    disabled={!hasPermission('change_projectservice')}
+                                    value={service.actual_end_date || ''}
+                                    onChange={e => setServiceField(sIdx, 'actual_end_date', e.target.value)}
+                                    className={`${smallInputCls} w-full h-[42px] text-emerald-500 font-bold`} />
+                            </div>
                             <div className="space-y-1">
                                 <label className="text-[10px] text-indigo-500 font-bold block uppercase tracking-wider">Service Allocation Start</label>
                                 <input type="date"
@@ -247,9 +411,9 @@ const ServiceFormCard: React.FC<{
                     </div>
                     <div className="flex items-center gap-2">
                         {hasPermission('delete_projectservice') && (
-                        <button type="button" onClick={(e) => { e.stopPropagation(); removeItem('services', sIdx); }} className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-2xl">
-                            <Trash2 size={20} />
-                        </button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); removeItem('services', sIdx); }} className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-2xl">
+                                <Trash2 size={20} />
+                            </button>
                         )}
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isExpanded ? 'bg-primary/10 text-primary rotate-180' : 'bg-muted/10 text-muted'}`}>
                             <ChevronDown size={22} />
@@ -273,11 +437,17 @@ const ServiceFormCard: React.FC<{
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold text-muted uppercase tracking-widest">Team Group</label>
                                             <div className="flex items-center gap-2">
-                                                <select
+                                                <SearchableTeamSelect
                                                     value={service.teams?.[0]?.team || ''}
-                                                    onChange={e => {
-                                                        const val = parseInt(e.target.value);
-                                                        const selectedTeam = teams.find(t => t.id === val);
+                                                    onChange={async (val) => {
+                                                        let selectedTeam = teams.find(t => t.id === val);
+                                                        if (val && !selectedTeam) {
+                                                            try {
+                                                                selectedTeam = await getTeam(val);
+                                                            } catch (err) {
+                                                                console.error("Failed to fetch team details:", err);
+                                                            }
+                                                        }
 
                                                         setFormData((p: any) => {
                                                             const services = [...p.services];
@@ -287,7 +457,7 @@ const ServiceFormCard: React.FC<{
                                                             if (pt.length === 0) {
                                                                 s.teams = [{ team: val, allocated_days: 0, actual_days: 0, status: 'Pending' }];
                                                             } else {
-                                                                pt[0] = { ...pt[0], team: val, status: pt[0].status || 'Pending' };
+                                                                pt[0] = { ...pt[0], team: val };
                                                                 s.teams = pt;
                                                             }
 
@@ -315,10 +485,7 @@ const ServiceFormCard: React.FC<{
                                                                     actual_days: 0,
                                                                     employee: user.id,
                                                                     employee_name: user.first_name || user.username || `ID: ${user.id}`,
-                                                                    start_date: s.start_date || '',
-                                                                    end_date: s.deadline || '',
-                                                                    status: 'Pending',
-                                                                    notes: `Added from ${selectedTeam.name}`
+                                                                    status: 'Pending'
                                                                 }));
                                                                 s.members = [...currentMembers, ...newMembers];
                                                             }
@@ -327,13 +494,8 @@ const ServiceFormCard: React.FC<{
                                                             return { ...p, services: services };
                                                         });
                                                     }}
-                                                    className={`${smallInputCls} flex-1`}
-                                                >
-                                                    <option value="">Select a team...</option>
-                                                    {teams.map(t => (
-                                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                                    ))}
-                                                </select>
+                                                    className="w-full"
+                                                />
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -499,25 +661,14 @@ const ServiceFormCard: React.FC<{
                                                             className={`${smallInputCls} text-emerald-500 font-bold`} />
                                                     </div>
                                                     <div className="space-y-1">
-                                                        <label className="text-[10px] text-muted font-bold uppercase">Employee</label>
-                                                        <select
+                                                        <label className={labelCls}>Employee</label>
+                                                        <SearchableUserSelect
                                                             value={m.employee || ''}
-                                                            onChange={e => setServiceTeamMember(sIdx, mIdx, 'employee', parseInt(e.target.value))}
-                                                            className={smallInputCls}
-                                                        >
-                                                            <option value="">Select Employee...</option>
-                                                            {users.map(u => (
-                                                                <option key={u.id} value={u.id}>
-                                                                    {(u.first_name || u.last_name) ? `${u.first_name} ${u.last_name}` : u.username}
-                                                                </option>
-                                                            ))}
-                                                            {/* Show only the name if lookup in the global users list fails */}
-                                                            {m.employee && !users.some(u => u.id === m.employee) && (
-                                                                <option value={m.employee}>
-                                                                    {m.employee_name || `ID: ${m.employee}`}
-                                                                </option>
-                                                            )}
-                                                        </select>
+                                                            onChange={val => setServiceTeamMember(sIdx, mIdx, 'employee', val)}
+                                                            disabled={!hasPermission('change_projectservice')}
+                                                            placeholder="Search Employee..."
+                                                            className="w-full"
+                                                        />
                                                     </div>
                                                     <div className="space-y-1">
                                                         <label className="text-[10px] text-muted font-bold uppercase">Allocated Days</label>
@@ -697,15 +848,11 @@ const COMMON_ROLES = [
     "Solution Architect"
 ];
 
-const inputCls = "w-full px-4 py-3 bg-background border border-border rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all";
-const smallInputCls = "w-full px-3 py-2.5 bg-background border border-border rounded-xl text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-all";
-const labelCls = "text-[11px] font-bold text-muted uppercase tracking-widest mb-1.5 block";
-
-
 // ─── Main Component ──────────────────────────────────────────────────────────
 const ProjectForm: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const { hasPermission } = usePermission();
     const isEdit = !!id;
 
@@ -714,10 +861,50 @@ const ProjectForm: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [teams, setTeams] = useState<TeamDetail[]>([]);
     const [users, setUsers] = useState<User[]>([]);
-    const [natures, setNatures] = useState<ProjectNature[]>([]);
     const [isAddingNature, setIsAddingNature] = useState(false);
     const [newNatureName, setNewNatureName] = useState('');
+    const [isBillingModalOpen, setIsBillingModalOpen] = useState(false);
     const [isQuickTeamModalOpen, setIsQuickTeamModalOpen] = useState(false);
+    const [billingPreviewItems, setBillingPreviewItems] = useState<any[]>([]);
+    const [savedProjectRef, setSavedProjectRef] = useState<any>(null);
+
+    const handleBillingConfirm = async () => {
+        if (savedProjectRef) {
+            const bizAddr = savedProjectRef.project_business_addresses?.[0]?.id;
+            if (bizAddr) {
+                await billAllPendingItems(bizAddr, savedProjectRef, billingPreviewItems);
+            }
+        }
+        setIsBillingModalOpen(false);
+        navigate('/projects');
+    };
+
+    const handleBillingSkip = () => {
+        setIsBillingModalOpen(false);
+        navigate('/projects');
+    };
+
+    const handleUpdateBillingItem = (idx: number, field: string, value: any) => {
+        setBillingPreviewItems(prev => {
+            const next = [...prev];
+            next[idx] = { ...next[idx], [field]: value };
+            return next;
+        });
+    };
+
+    const handleAddBillingItem = () => {
+        setBillingPreviewItems(prev => [
+            ...prev,
+            {
+                service_type: "New Service",
+                description: "",
+                rate: "0.00",
+                quantity: 1,
+                purchase_date: new Date().toISOString().split('T')[0],
+                expairy_date: ''
+            }
+        ]);
+    };
     const [teamAssignmentTarget, setTeamAssignmentTarget] = useState<{ type: 'service' | 'project', idx: number } | null>(null);
 
     const blankBase = () => ({
@@ -738,8 +925,14 @@ const ProjectForm: React.FC = () => {
     const blankDocument = () => ({
         name: '', document: '', description: ''
     });
+    const blankExbot = () => ({
+        whatsapp_number: '', plan_category: 'Premium', plan_active_date: '', plan_deactive_date: '', plan_rate: '0.00', payment_status: 'UNPAID', status: 'Active', description: ''
+    });
     const blankAddress = () => ({
-        attention_name: '', legal_name: '', billing_email: '', billing_phone: '', gst_number: '', pan_number: '', logo: '', unit_or_floor: '', building_name: '', plot_number: '', street_name: '', landmark: '', locality: '', city: '', district: '', state: '', pin_code: '', country: 'India'
+        attention_name: '', unit_or_floor: '', building_name: '', plot_number: '',
+        street_name: '', landmark: '', locality: '', city: '', district: '',
+        state: '', pin_code: '', country: 'India', email: '', phone: '',
+        legal_name: '', gst_number: '', pan_number: ''
     });
 
     const [formData, setFormData] = useState<any>({
@@ -750,6 +943,7 @@ const ProjectForm: React.FC = () => {
         project_clients: [blankClient()],
         project_business_addresses: [blankAddress()],
         project_domains: [], project_servers: [],
+        project_exbots: [],
         project_documents: [],
         project_teams: [], project_team_members: [],
         services: [],
@@ -760,13 +954,12 @@ const ProjectForm: React.FC = () => {
         const loadData = async () => {
             try {
                 const teamsData = await getTeams();
-                setTeams(teamsData);
+                setTeams(teamsData.results || []);
 
                 const usersData = await getUsers();
                 setUsers(usersData.results);
 
-                const natureData = await getProjectNatures();
-                setNatures(natureData);
+                // Project natures are now handled by SearchableNatureSelect component
 
                 if (isEdit && id) {
                     const projectData = await getProject(parseInt(id));
@@ -806,11 +999,10 @@ const ProjectForm: React.FC = () => {
                             status: cleanStatus(m.status),
                             employee_name: m.employee_name || usersData.results.find((u: any) => u.id === m.employee)?.first_name
                         })),
+                        project_exbots: projectData.project_exbots || [],
                         project_business_addresses: (projectData.project_business_addresses && projectData.project_business_addresses.length > 0) ? projectData.project_business_addresses : [blankAddress()]
                     };
                     setFormData(cleanedData);
-                } else if (natureData.length > 0) {
-                    setFormData((p: any) => ({ ...p, project_nature: natureData[0].id }));
                 }
             } catch (err) {
                 setError('Failed to load required data.');
@@ -820,6 +1012,21 @@ const ProjectForm: React.FC = () => {
         };
         loadData();
     }, [isEdit, id]);
+
+    // Scroll to anchor section (e.g. #section-client-address from warning button)
+    useEffect(() => {
+        if (!loading && location.hash) {
+            const el = document.getElementById(location.hash.replace('#', ''));
+            if (el) {
+                setTimeout(() => {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    el.style.outline = '2px solid #f59e0b';
+                    el.style.borderRadius = '1.5rem';
+                    setTimeout(() => { el.style.outline = ''; }, 2500);
+                }, 500);
+            }
+        }
+    }, [loading, location.hash]);
 
     // ── Generic Handlers ──────────────────────────────────────────────────
     const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -1047,7 +1254,6 @@ const ProjectForm: React.FC = () => {
         }
         try {
             const nature = await createProjectNature(newNatureName);
-            setNatures(p => [...p, nature]);
             setFormData((p: any) => ({ ...p, project_nature: nature.id }));
             setNewNatureName('');
             setIsAddingNature(false);
@@ -1068,11 +1274,121 @@ const ProjectForm: React.FC = () => {
         if (window.confirm('Are you sure you want to delete this project nature?')) {
             try {
                 await deleteProjectNature(formData.project_nature);
-                setNatures(p => p.filter(n => n.id !== formData.project_nature));
                 setFormData((p: any) => ({ ...p, project_nature: '' }));
             } catch (err) {
                 alert('Failed to delete project nature. It might be in use.');
             }
+        }
+    };
+
+    const getPendingItems = (project: any) => {
+        const items: any[] = [];
+        // 1. Domains
+        (project.project_domains || []).forEach((d: any) => {
+            if (d.invoice_status !== 'INVOICED' && d.accrued_by === 'Extechnology') {
+                items.push({
+                    service_type: "Domain Registration/Renewal",
+                    description: `Domain: ${d.name}`,
+                    rate: d.cost || 0,
+                    quantity: 1,
+                    purchase_date: d.purchase_date,
+                    expairy_date: d.expiration_date,
+                    project_domain: d.id
+                });
+            }
+        });
+        // 2. Servers
+        (project.project_servers || []).forEach((s: any) => {
+            if (s.invoice_status !== 'INVOICED' && s.accrued_by === 'Extechnology') {
+                items.push({
+                    service_type: "Server/Hosting",
+                    description: `Server: ${s.name} (${s.server_type})`,
+                    rate: s.cost || 0,
+                    quantity: 1,
+                    purchase_date: s.purchase_date,
+                    expairy_date: s.expiration_date,
+                    project_server: s.id
+                });
+            }
+        });
+        // 3. Services
+        (project.services || []).forEach((svc: any) => {
+            if (svc.invoice_status !== 'INVOICED') {
+                const startDate = svc.start_date || svc.teams?.[0]?.start_date || '';
+                const endDate = svc.deadline || svc.teams?.[0]?.end_date || '';
+                items.push({
+                    service_type: "Project Service",
+                    description: `Service: ${svc.name}`,
+                    rate: svc.cost || 0,
+                    quantity: 1,
+                    purchase_date: startDate,
+                    expairy_date: endDate,
+                    project_service: svc.id
+                });
+            }
+        });
+        // 4. Teams
+        (project.project_teams || []).forEach((t: any) => {
+            if (t.invoice_status !== 'INVOICED') {
+                items.push({
+                    service_type: "Team Allocation",
+                    description: `Team: ${t.team_detail?.name || 'Assigned Team'}`,
+                    rate: t.cost || 0,
+                    quantity: 1,
+                    purchase_date: t.start_date,
+                    expairy_date: t.end_date,
+                    project_team: t.id
+                });
+            }
+        });
+        // 5. Exbots
+        (project.project_exbots || []).forEach((e: any) => {
+            if (e.invoice_status !== 'INVOICED') {
+                items.push({
+                    service_type: "Exbot Subscription",
+                    description: `Exbot: ${e.whatsapp_number} (${e.plan_category})`,
+                    rate: e.plan_rate || 0,
+                    quantity: 1,
+                    purchase_date: e.plan_active_date,
+                    expairy_date: e.plan_deactive_date,
+                    project_exbot: e.id
+                });
+            }
+        });
+        // 6. Finances (Phases)
+        (project.project_finances || []).forEach((f: any, idx: number) => {
+            if (f.invoice_status !== 'INVOICED') {
+                items.push({
+                    service_type: "Project Financial Phase",
+                    description: `Finance Phase #${idx + 1}`,
+                    rate: f.project_cost || 0,
+                    quantity: 1,
+                    project_finance: f.id
+                });
+            }
+        });
+        return items;
+    };
+
+    const billAllPendingItems = async (bizAddr: number, project: any, customItems?: any[]) => {
+        const items = customItems || getPendingItems(project);
+        const dueDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        if (items.length === 0) return null;
+
+        const payload = {
+            client_company: { id: bizAddr },
+            tax_rate: 0,
+            discount_amount: 0,
+            due_date: dueDate,
+            items: items
+        };
+
+        try {
+            return await createInvoice(bizAddr, payload);
+        } catch (err) {
+            console.error("Consolidated auto-billing failed:", err);
+            return null;
         }
     };
 
@@ -1091,6 +1407,8 @@ const ProjectForm: React.FC = () => {
             else if (type === 'domain') params.append('domain_id', entityId.toString());
             else if (type === 'service') params.append('service_id', entityId.toString());
             else if (type === 'team') params.append('team_id', entityId.toString());
+            else if (type === 'exbot') params.append('exbot_id', entityId.toString());
+            else if (type === 'finance') params.append('finance_id', entityId.toString());
         } else {
             console.warn(`Attempted to bill ${type} without an entity ID.`);
         }
@@ -1166,10 +1484,21 @@ const ProjectForm: React.FC = () => {
                 })),
                 project_team_members: finalFormData.project_team_members?.map((m: any) => ({ ...m, project: projectId }))
             };
-            if (isEdit && id) await updateProject(parseInt(id), payload);
-            else await createProject(payload);
+            let savedProject: any;
+            if (isEdit && id) savedProject = await updateProject(parseInt(id), payload);
+            else savedProject = await createProject(payload);
 
-            // Legacy auto-invoice logic removed as individual bill buttons are now used
+            // ── Auto Invoice Logic ──
+            const bizAddr = savedProject.project_business_addresses?.[0]?.id;
+            if (bizAddr) {
+                const pendingItems = getPendingItems(savedProject);
+                if (pendingItems.length > 0) {
+                    setBillingPreviewItems(pendingItems);
+                    setSavedProjectRef(savedProject);
+                    setIsBillingModalOpen(true);
+                    return; // Wait for modal action
+                }
+            }
 
             navigate('/projects');
         } catch (err: any) {
@@ -1328,18 +1657,12 @@ const ProjectForm: React.FC = () => {
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <select
-                                                        name="project_nature"
+                                                    <SearchableNatureSelect
                                                         value={formData.project_nature}
                                                         disabled={!hasPermission('change_projectnature')}
-                                                        onChange={handleInput}
-                                                        className={`${inputCls} flex-1`}
-                                                    >
-                                                        <option value="">Select Nature</option>
-                                                        {natures.map(n => (
-                                                            <option key={n.id} value={n.id}>{n.name}</option>
-                                                        ))}
-                                                    </select>
+                                                        onChange={val => setFormData((p: any) => ({ ...p, project_nature: val }))}
+                                                        className="flex-1"
+                                                    />
                                                     {hasPermission('add_projectnature') && (
                                                         <button
                                                             type="button"
@@ -1383,81 +1706,81 @@ const ProjectForm: React.FC = () => {
 
                 {/* ── 2. Timeline ── */}
                 {hasPermission('view_projectexcution') && (
-                                    <FormSection title="Timeline" icon={<Calendar size={22} />} iconColor="text-amber-500" bgColor="bg-amber-500/10" defaultOpen
-                                        action={
-                                            (hasPermission('add_projectexcution') && (!formData.project_excutions || formData.project_excutions.length === 0)) ? (
-                                                <button type="button" onClick={() => addItem('project_excutions', blankExecution())}
-                                                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-500 rounded-xl hover:bg-amber-500/20 transition-all font-bold">
-                                                    <Plus size={14} /> Add Phase
-                                                </button>
-                                            ) : null
-                                        }>
-                                        <div className="space-y-8">
-                                            {formData.project_excutions?.map((exec: any, idx: number) => (
-                                                <div key={idx} className={`space-y-4 ${idx > 0 ? 'pt-8 border-t border-border' : ''}`}>
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-xs font-black text-amber-500 uppercase tracking-widest">Execution Phase #{idx + 1}</span>
-                                                        {idx > 0 && hasPermission('delete_projectexcution') && (
-                                                            <button type="button" onClick={() => removeItem('project_excutions', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl">
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                                        <div className="space-y-2">
-                                                            <label className={labelCls}>Approach Date</label>
-                                                            <input type="date"
-                                                                value={exec.project_approach_date || ''}
-                                                                disabled={!hasPermission('change_projectexcution')}
-                                                                onChange={e => setNested('project_excutions', idx, 'project_approach_date', e.target.value)}
-                                                                className={inputCls} />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className={labelCls}>Work Assigned</label>
-                                                            <input type="date"
-                                                                value={exec.work_assigned_date || ''}
-                                                                disabled={!hasPermission('change_projectexcution')}
-                                                                onChange={e => setNested('project_excutions', idx, 'work_assigned_date', e.target.value)}
-                                                                className={inputCls} />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className={labelCls}>Start Date</label>
-                                                            <input type="date"
-                                                                value={exec.start_date || ''}
-                                                                disabled={!hasPermission('change_projectexcution')}
-                                                                onChange={e => setNested('project_excutions', idx, 'start_date', e.target.value)}
-                                                                className={inputCls} />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className={labelCls}>Delivery Deadline</label>
-                                                            <input type="date"
-                                                                value={exec.assigned_delivery_date || ''}
-                                                                disabled={!hasPermission('change_projectexcution')}
-                                                                onChange={e => setNested('project_excutions', idx, 'assigned_delivery_date', e.target.value)}
-                                                                className={inputCls} />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className={labelCls}>Confirmed End</label>
-                                                            <input type="date"
-                                                                value={exec.confirmed_end_date || ''}
-                                                                disabled={!hasPermission('change_projectexcution')}
-                                                                onChange={e => setNested('project_excutions', idx, 'confirmed_end_date', e.target.value)}
-                                                                className={inputCls} />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className={labelCls}>Actual End</label>
-                                                            <input type="date"
-                                                                value={exec.end_date || ''}
-                                                                disabled={!hasPermission('change_projectexcution')}
-                                                                onChange={e => setNested('project_excutions', idx, 'end_date', e.target.value || null)}
-                                                                className={inputCls} />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
+                    <FormSection title="Timeline" icon={<Calendar size={22} />} iconColor="text-amber-500" bgColor="bg-amber-500/10" defaultOpen
+                        action={
+                            (hasPermission('add_projectexcution') && (!formData.project_excutions || formData.project_excutions.length === 0)) ? (
+                                <button type="button" onClick={() => addItem('project_excutions', blankExecution())}
+                                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 text-amber-500 rounded-xl hover:bg-amber-500/20 transition-all font-bold">
+                                    <Plus size={14} /> Add Phase
+                                </button>
+                            ) : null
+                        }>
+                        <div className="space-y-8">
+                            {formData.project_excutions?.map((exec: any, idx: number) => (
+                                <div key={idx} className={`space-y-4 ${idx > 0 ? 'pt-8 border-t border-border' : ''}`}>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-black text-amber-500 uppercase tracking-widest">Execution Phase #{idx + 1}</span>
+                                        {idx > 0 && hasPermission('delete_projectexcution') && (
+                                            <button type="button" onClick={() => removeItem('project_excutions', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl">
+                                                <Trash2 size={18} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <div className="space-y-2">
+                                            <label className={labelCls}>Approach Date</label>
+                                            <input type="date"
+                                                value={exec.project_approach_date || ''}
+                                                disabled={!hasPermission('change_projectexcution')}
+                                                onChange={e => setNested('project_excutions', idx, 'project_approach_date', e.target.value)}
+                                                className={inputCls} />
                                         </div>
-                                    </FormSection>
-                                )}
+                                        <div className="space-y-2">
+                                            <label className={labelCls}>Work Assigned</label>
+                                            <input type="date"
+                                                value={exec.work_assigned_date || ''}
+                                                disabled={!hasPermission('change_projectexcution')}
+                                                onChange={e => setNested('project_excutions', idx, 'work_assigned_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className={labelCls}>Start Date</label>
+                                            <input type="date"
+                                                value={exec.start_date || ''}
+                                                disabled={!hasPermission('change_projectexcution')}
+                                                onChange={e => setNested('project_excutions', idx, 'start_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className={labelCls}>Delivery Deadline</label>
+                                            <input type="date"
+                                                value={exec.assigned_delivery_date || ''}
+                                                disabled={!hasPermission('change_projectexcution')}
+                                                onChange={e => setNested('project_excutions', idx, 'assigned_delivery_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className={labelCls}>Confirmed End</label>
+                                            <input type="date"
+                                                value={exec.confirmed_end_date || ''}
+                                                disabled={!hasPermission('change_projectexcution')}
+                                                onChange={e => setNested('project_excutions', idx, 'confirmed_end_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className={labelCls}>Actual End</label>
+                                            <input type="date"
+                                                value={exec.end_date || ''}
+                                                disabled={!hasPermission('change_projectexcution')}
+                                                onChange={e => setNested('project_excutions', idx, 'end_date', e.target.value || null)}
+                                                className={inputCls} />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </FormSection>
+                )}
 
                 {/* ── 3. Financials ── */}
                 {hasPermission('view_projectfinance') && (
@@ -1483,21 +1806,1115 @@ const ProjectForm: React.FC = () => {
                                     </div>
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {[
-                                            { key: 'project_cost', label: 'Total Budget' },
-                                            { key: 'manpower_cost', label: 'Manpower Cost' },
-                                            { key: 'total_invoiced', label: 'Total Invoiced' },
-                                            { key: 'total_paid', label: 'Total Paid' },
-                                            { key: 'total_balance_due', label: 'Balance Due' },
-                                        ].map(({ key, label }) => (
+                                            { key: 'project_cost', label: 'Total Budget', placeholder: '0.00' },
+                                            { key: 'manpower_cost', label: 'Manpower Cost', placeholder: '0.00' },
+                                        ].map(({ key, label, placeholder }) => (
                                             <div key={key} className="space-y-2">
                                                 <label className={labelCls}>{label}</label>
                                                 <input
-                                                    type="number" step="0.01"
-                                                    value={fin[key] || '0.00'}
+                                                    type="number" step="0.01" placeholder={placeholder}
+                                                    value={fin[key] || ''}
                                                     disabled={!hasPermission('change_projectfinance')}
                                                     onChange={e => setNested('project_finances', idx, key, e.target.value)}
                                                     className={`${inputCls} font-bold`}
                                                 />
+                                            </div>
+                                        ))}
+                                        <div className="md:col-span-1 flex flex-col justify-end space-y-2 pb-1">
+                                            <label className={labelCls}>Billing Status</label>
+                                            <div className="flex items-center gap-2">
+                                                {fin.invoice_status === 'INVOICED' ? (
+                                                    <div className="flex items-center gap-1.5 text-indigo-500 bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-500/20" title="Phase has been invoiced">
+                                                        <Receipt size={14} />
+                                                        <span className="text-[10px] font-black uppercase tracking-wider">Invoiced</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1.5 text-rose-500 bg-rose-500/5 px-3 py-1.5 rounded-xl border border-rose-500/10" title="Phase not yet invoiced">
+                                                        <Clock size={14} />
+                                                        <span className="text-[10px] font-black uppercase tracking-wider">Not Invoiced</span>
+                                                    </div>
+                                                )}
+                                                {fin.invoice_status !== 'INVOICED' && fin.id && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleBillItem('finance', `Finance Phase #${idx + 1}`, fin.project_cost || 0, '', '', fin.id)}
+                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-xl text-[10px] font-black uppercase tracking-wider border border-emerald-500/20 transition-all shadow-sm"
+                                                        title="Generate Invoice"
+                                                    >
+                                                        <Receipt size={14} />
+                                                        <span>Bill Now</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </FormSection>
+                )}
+
+                { /* ── 4. Client & Address ── */}
+                {(hasPermission('view_projectclient') || hasPermission('view_projectbusinessaddress')) && (
+                    <FormSection title="Client & Address" icon={<MapPin size={22} />} iconColor="text-rose-500" bgColor="bg-rose-500/10" defaultOpen={isEdit}
+                        action={
+                            hasPermission('add_projectclient') ? (
+                                <button type="button" onClick={() => addItem('project_clients', blankClient())}
+                                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-500/20 transition-all font-bold">
+                                    <Plus size={14} /> Add Client
+                                </button>
+                            ) : null
+                        }>
+                        {hasPermission('view_projectclient') && (
+                            <div className="space-y-8">
+                                {formData.project_clients?.map((client: any, idx: number) => (
+                                    <div key={idx} className={`space-y-6 ${idx > 0 ? 'pt-8 border-t border-border' : ''}`}>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs font-black text-rose-500 uppercase tracking-widest">Client Entry #{idx + 1}</span>
+                                            {idx > 0 && hasPermission('delete_projectclient') && (
+                                                <button type="button" onClick={() => removeItem('project_clients', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl">
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {[
+                                                { key: 'company_name', label: 'Company Name', placeholder: 'Acme Corp' },
+                                                { key: 'contact_person', label: 'Contact Person', placeholder: 'John Smith' },
+                                                { key: 'email', label: 'Email', placeholder: 'contact@company.com' },
+                                                { key: 'phone', label: 'Phone', placeholder: '+91 98765 43210' },
+                                            ].map(({ key, label, placeholder }) => (
+                                                <div key={key} className="space-y-2">
+                                                    <label className={labelCls}>{label}</label>
+                                                    <input
+                                                        type="text" placeholder={placeholder}
+                                                        value={client[key] || ''}
+                                                        disabled={!hasPermission('change_projectclient')}
+                                                        onChange={e => setNested('project_clients', idx, key, e.target.value)}
+                                                        className={inputCls}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {/* Business Addresses */}
+                        {hasPermission('view_projectbusinessaddress') && (
+                            <div id="section-client-address" className="mt-8 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <label className={labelCls}>Business Addresses</label>
+                                    {hasPermission('add_projectbusinessaddress') && (!formData.project_business_addresses || formData.project_business_addresses.length === 0) && (
+                                        <button type="button"
+                                            onClick={() => addItem('project_business_addresses', blankAddress())}
+                                            className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-500/20 transition-all font-bold">
+                                            <Plus size={14} /> Add Address
+                                        </button>
+                                    )}
+                                </div>
+                                {formData.project_business_addresses?.map((addr: any, idx: number) => (
+                                    <div key={idx} className="p-6 bg-muted/5 border border-border rounded-[2rem] space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-[11px] font-black text-rose-500 uppercase tracking-widest">📍 Address #{idx + 1}</span>
+                                                {hasPermission('change_projectbusinessaddress') && (
+                                                    <AddressPicker
+                                                        selectedId={addr.id}
+                                                        onSelect={(selected) => {
+                                                            setFormData((p: any) => {
+                                                                const arr = [...(p.project_business_addresses || [])];
+                                                                arr[idx] = { ...arr[idx], ...selected };
+                                                                return { ...p, project_business_addresses: arr };
+                                                            });
+                                                        }} />
+                                                )}
+                                            </div>
+                                            {hasPermission('delete_projectbusinessaddress') && (
+                                                <button type="button" onClick={() => removeItem('project_business_addresses', idx)}
+                                                    className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl">
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {[
+                                                { key: 'legal_name', label: 'Legal Name' },
+                                                { key: 'attention_name', label: 'Attention Name' },
+                                                { key: 'email', label: 'Billing Email' },
+                                                { key: 'phone', label: 'Billing Phone' },
+                                                { key: 'gst_number', label: 'GST Number' },
+                                                { key: 'pan_number', label: 'PAN Number' },
+                                                { key: 'logo', label: 'Logo URL' },
+                                                { key: 'unit_or_floor', label: 'Unit / Floor' },
+                                                { key: 'building_name', label: 'Building Name' },
+                                                { key: 'plot_number', label: 'Plot Number' },
+                                                { key: 'street_name', label: 'Street Name' },
+                                                { key: 'landmark', label: 'Landmark' },
+                                                { key: 'locality', label: 'Locality' },
+                                                { key: 'city', label: 'City' },
+                                                { key: 'district', label: 'District' },
+                                                { key: 'state', label: 'State' },
+                                                { key: 'pin_code', label: 'PIN Code' },
+                                                { key: 'country', label: 'Country' },
+                                            ].map(({ key, label }) => {
+                                                if (key === 'logo') {
+                                                    return (
+                                                        <div key={key} className="space-y-1">
+                                                            <label className={labelCls}>{label}</label>
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="flex-1 relative">
+                                                                    <input
+                                                                        type="file"
+                                                                        accept="image/*"
+                                                                        disabled={!hasPermission('change_projectbusinessaddress')}
+                                                                        onChange={(e) => {
+                                                                            const file = e.target.files?.[0];
+                                                                            if (file) {
+                                                                                setNested('project_business_addresses', idx, 'logo', file);
+                                                                            }
+                                                                        }}
+                                                                        className="hidden"
+                                                                        id={`logo-upload-${idx}`}
+                                                                    />
+                                                                    <label
+                                                                        htmlFor={`logo-upload-${idx}`}
+                                                                        className={`flex items-center justify-center gap-2 px-4 py-2.5 bg-background border border-dashed border-border rounded-xl text-muted text-xs font-bold transition-all w-full ${hasPermission('change_projectbusinessaddress') ? 'cursor-pointer hover:border-primary/50 hover:bg-primary/5' : 'cursor-not-allowed opacity-60'}`}
+                                                                    >
+                                                                        {addr.logo ? 'Change Logo' : 'Upload Logo'}
+                                                                    </label>
+                                                                </div>
+                                                                {addr.logo && (
+                                                                    <div className="relative group">
+                                                                        <img src={typeof addr.logo === 'string' ? addr.logo : URL.createObjectURL(addr.logo as any)} alt="Preview" className="w-10 h-10 object-contain rounded-lg border border-border bg-white" />
+                                                                        <a
+                                                                            href={typeof addr.logo === 'string' ? addr.logo : URL.createObjectURL(addr.logo as any)}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="absolute -bottom-2 -right-2 bg-primary text-white rounded-full p-1 shadow-lg hover:scale-110 transition-transform"
+                                                                        >
+                                                                            <ChevronRight size={10} />
+                                                                        </a>
+                                                                        {hasPermission('change_projectbusinessaddress') && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setNested('project_business_addresses', idx, 'logo', '')}
+                                                                                className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                            >
+                                                                                <X size={10} />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <div key={key} className="space-y-1">
+                                                        <label className={labelCls}>{label}</label>
+                                                        <input type="text" placeholder={label}
+                                                            value={addr[key] || ''} onChange={e => setNested('project_business_addresses', idx, key, e.target.value)}
+                                                            required={key === 'legal_name'}
+                                                            disabled={!hasPermission('change_projectbusinessaddress')}
+                                                            className={inputCls} />
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </FormSection>
+                )}
+
+                {hasPermission('view_projectdocument') && (
+                    <FormSection
+                        title="Project Documents"
+                        icon={<FileText size={22} />}
+                        iconColor="text-orange-500"
+                        action={
+                            hasPermission('add_projectdocument') ? (
+                                <button type="button"
+                                    onClick={() => addItem('project_documents', blankDocument())}
+                                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 text-orange-500 rounded-xl hover:bg-orange-500/20 transition-all font-bold">
+                                    <Plus size={14} /> Add Document
+                                </button>
+                            ) : null
+                        }
+                    >
+                        <div className="space-y-4">
+                            {formData.project_documents.map((doc: any, idx: number) => (
+                                <div key={idx} className="p-6 bg-muted/5 rounded-3xl border border-border relative group animate-in slide-in-from-top-4 duration-300">
+                                    {hasPermission('delete_projectdocument') && (
+                                        <button type="button" onClick={() => removeItem('project_documents', idx)}
+                                            className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all shadow-lg">
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        <div className="space-y-2">
+                                            <label className={labelCls}>Document Name</label>
+                                            <input type="text" placeholder="e.g. Project Charter"
+                                                value={doc.name} onChange={e => setNested('project_documents', idx, 'name', e.target.value)}
+                                                disabled={!hasPermission('change_projectdocument')}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className={labelCls}>Description</label>
+                                            <input type="text" placeholder="Short description..."
+                                                value={doc.description} onChange={e => setNested('project_documents', idx, 'description', e.target.value)}
+                                                disabled={!hasPermission('change_projectdocument')}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className={labelCls}>Upload Document</label>
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex-1 relative">
+                                                    <input
+                                                        type="file"
+                                                        disabled={!hasPermission('change_projectdocument')}
+                                                        onChange={(e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (file) {
+                                                                setNested('project_documents', idx, 'document', file);
+                                                            }
+                                                        }}
+                                                        className="hidden"
+                                                        id={`doc-upload-${idx}`}
+                                                    />
+                                                    <label
+                                                        style={{ opacity: hasPermission('change_projectdocument') ? 1 : 0.5, cursor: hasPermission('change_projectdocument') ? 'pointer' : 'not-allowed' }}
+                                                        htmlFor={hasPermission('change_projectdocument') ? `doc-upload-${idx}` : undefined}
+                                                        className="flex items-center justify-center gap-2 px-4 py-3 bg-background border border-dashed border-border rounded-2xl text-muted text-sm font-bold hover:border-orange-500/50 hover:bg-orange-500/5 transition-all w-full"
+                                                    >
+                                                        {doc.document ? 'Change File' : 'Choose File'}
+                                                    </label>
+                                                </div>
+                                                {doc.document && (
+                                                    <a
+                                                        href={typeof doc.document === 'string' ? doc.document : URL.createObjectURL(doc.document as any)}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="bg-emerald-500/10 text-emerald-500 p-2.5 rounded-2xl border border-emerald-500/20 hover:bg-emerald-500/20 transition-all flex items-center gap-2 group/view"
+                                                    >
+                                                        <FileText size={20} />
+                                                        <span className="text-[10px] font-bold uppercase tracking-widest hidden group-hover/view:inline">View</span>
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {formData.project_documents.length === 0 && (
+                                <div className="text-center py-12 bg-muted/5 rounded-[2.5rem] border border-dashed border-border">
+                                    <div className="w-16 h-16 bg-muted/10 rounded-3xl flex items-center justify-center mx-auto mb-4 text-muted">
+                                        <FileText size={32} />
+                                    </div>
+                                    <h4 className="text-lg font-black text-foreground italic uppercase">No Documents Attached</h4>
+                                    <p className="text-muted text-xs font-medium mt-1">
+                                        {hasPermission('add_projectdocument') ? 'Click the button above to add project documentation' : 'You do not have permission to add documents'}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </FormSection>
+                )}
+
+                {/* ── 5. Infrastructure ── */}
+                {(hasPermission('view_projectdomain') || hasPermission('view_projectserver')) && (
+                    <FormSection
+                        title="Infrastructure"
+                        icon={<Server size={22} />}
+                        iconColor="text-blue-500"
+                        bgColor="bg-blue-500/10"
+                        action={
+                            <div className="flex gap-2">
+                                {hasPermission('add_projectdomain') && (
+                                    <button type="button"
+                                        onClick={() => addItem('project_domains', { name: '', accrued_by: 'Extechnology', purchased_from: '', purchase_date: '', expiration_date: '', status: 'Active', cost: '0.00' })}
+                                        className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 transition-all font-bold">
+                                        <Plus size={14} /> Domain
+                                    </button>
+                                )}
+                                {hasPermission('add_projectserver') && (
+                                    <button type="button"
+                                        onClick={() => addItem('project_servers', { name: '', server_type: 'VPS', accrued_by: 'Extechnology', purchased_from: '', purchase_date: '', expiration_date: '', status: 'Active', cost: '0.00' })}
+                                        className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 text-indigo-500 rounded-xl hover:bg-indigo-500/20 transition-all font-bold">
+                                        <Plus size={14} /> Server
+                                    </button>
+                                )}
+                                {hasPermission('add_projectexbot') && (
+                                    <button type="button"
+                                        onClick={() => addItem('project_exbots', blankExbot())}
+                                        className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-xl hover:bg-emerald-500/20 transition-all font-bold">
+                                        <Plus size={14} /> Exbot
+                                    </button>
+                                )}
+                            </div>
+                        }>
+                        <div className="space-y-6">
+                            {formData.project_domains.length === 0 && formData.project_servers.length === 0 && formData.project_exbots.length === 0 && (
+                                <p className="text-center text-muted text-sm py-6">No domains, servers, or exbots added yet.</p>
+                            )}
+                            {hasPermission('view_projectdomain') && formData.project_domains?.map((domain: any, idx: number) => (
+                                <div key={idx} className="p-6 bg-blue-500/5 border border-blue-500/20 rounded-[2rem] space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-black text-blue-500 uppercase tracking-widest">🌐 Domain #{idx + 1}</span>
+                                        {hasPermission('delete_projectdomain') && (
+                                            <button type="button" onClick={() => removeItem('project_domains', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl"><Trash2 size={18} /></button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Domain Name</label>
+                                            <input type="text" placeholder="e.g. mycompany.com"
+                                                disabled={!hasPermission('change_projectdomain')}
+                                                value={domain.name || ''} onChange={e => setNested('project_domains', idx, 'name', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Accrued By</label>
+                                            <select
+                                                value={domain.accrued_by || 'Extechnology'}
+                                                disabled={!hasPermission('change_projectdomain')}
+                                                onChange={e => setNested('project_domains', idx, 'accrued_by', e.target.value)}
+                                                className={inputCls}
+                                            >
+                                                <option value="Extechnology">Extechnology</option>
+                                                <option value="Client">Client</option>
+                                                <option value="Third Party">Third Party</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Purchased From</label>
+                                            <ProviderSelect
+                                                value={domain.purchased_from || ''}
+                                                onChange={(val) => setNested('project_domains', idx, 'purchased_from', val)}
+                                                options={['GoDaddy', 'Namecheap', 'Hostinger', 'Cloudflare', 'Google Domains', 'Porkbun', 'Bluehost', 'Domain.com', 'Network Solutions', 'BigRock']}
+                                                placeholder="e.g. GoDaddy"
+                                                className={`${inputCls} ${!hasPermission('change_projectdomain') ? 'opacity-60 pointer-events-none' : ''}`}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Purchase Date</label>
+                                            <input type="date"
+                                                disabled={!hasPermission('change_projectdomain')}
+                                                value={domain.purchase_date || ''} onChange={e => setNested('project_domains', idx, 'purchase_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className={`${labelCls} !mb-0`}>Expiration Date</label>
+                                                {hasPermission('change_projectdomain') && (
+                                                    <div className="flex items-center gap-1">
+                                                        {[{ label: '6m', m: 6 }, { label: '1y', m: 12 }, { label: '2y', m: 24 }, { label: '3y', m: 36 }].map(opt => (
+                                                            <button key={opt.label} type="button" onClick={(e) => { e.stopPropagation(); const pDate = domain.purchase_date || new Date().toISOString().split('T')[0]; const d = new Date(pDate); d.setUTCMonth(d.getUTCMonth() + opt.m); setNested('project_domains', idx, 'expiration_date', d.toISOString().split('T')[0]); }} className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 rounded-md font-bold transition-all">+{opt.label}</button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <input type="date"
+                                                disabled={!hasPermission('change_projectdomain')}
+                                                value={domain.expiration_date || ''} onChange={e => setNested('project_domains', idx, 'expiration_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Cost (₹)</label>
+                                            <input type="number" step="0.01" placeholder="0.00"
+                                                disabled={!hasPermission('change_projectdomain')}
+                                                value={domain.cost || ''} onChange={e => setNested('project_domains', idx, 'cost', e.target.value)}
+                                                className={`${inputCls} font-bold`} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Status</label>
+                                            <select disabled={!hasPermission('change_projectdomain')} value={domain.status || 'Active'} onChange={e => setNested('project_domains', idx, 'status', e.target.value)} className={inputCls}>
+                                                <option value="Active">Active</option>
+                                                <option value="Expired">Expired</option>
+                                                <option value="Pending">Pending</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className={`${labelCls} text-emerald-500 !mb-0`}>Payment Status</label>
+                                                {domain.accrued_by === 'Extechnology' && (
+                                                    domain.invoice_status === 'INVOICED' ? (
+                                                        <div className="flex items-center gap-1 text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20" title="Domain has been invoiced">
+                                                            <FileText size={12} />
+                                                            <span className="text-[9px] font-black uppercase">Invoiced</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1 text-rose-500 bg-rose-500/5 px-2 py-0.5 rounded-md border border-rose-500/10" title="Domain not yet invoiced">
+                                                            <X size={12} />
+                                                            <span className="text-[9px] font-black uppercase">Not Invoiced</span>
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <select disabled={!hasPermission('change_projectdomain')} value={domain.payment_status || 'UNPAID'} onChange={e => setNested('project_domains', idx, 'payment_status', e.target.value)} className={`${inputCls} flex-1 font-bold text-emerald-500`}>
+                                                    <option value="UNPAID">UNPAID</option>
+                                                    <option value="PARTIAL">PARTIAL</option>
+                                                    <option value="PAID">PAID</option>
+                                                </select>
+                                                {domain.accrued_by === 'Extechnology' && domain.invoice_status !== 'INVOICED' && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={!hasPermission('change_projectdomain')}
+                                                        onClick={() => handleBillItem('domain', domain.name || 'Domain', domain.cost || 0, domain.purchase_date, domain.expiration_date, domain.id)}
+                                                        className={`h-[46px] px-3 bg-emerald-500/10 text-emerald-500 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 ${hasPermission('change_projectdomain') ? 'hover:bg-emerald-500/20' : 'opacity-60 cursor-not-allowed'}`}
+                                                        title="Generate Invoice"
+                                                    >
+                                                        <Receipt size={18} />
+                                                        <span className="text-[10px] font-black uppercase">Bill</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {domain.accrued_by === 'Third Party' && (
+                                            <div className="lg:col-span-3 pt-4 border-t border-border/30">
+                                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                    🏢 Provider Details
+                                                </p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Company Name</label>
+                                                        <input type="text" placeholder="e.g. GoDaddy Inc."
+                                                            disabled={!hasPermission('change_projectdomain')}
+                                                            value={domain.provider_detail?.company_name || ''}
+                                                            onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), company_name: e.target.value })}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Contact Person</label>
+                                                        <input type="text" placeholder="Manager Name"
+                                                            disabled={!hasPermission('change_projectdomain')}
+                                                            value={domain.provider_detail?.contact_person || ''}
+                                                            onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), contact_person: e.target.value })}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Email</label>
+                                                        <input type="email" placeholder="provider@email.com"
+                                                            disabled={!hasPermission('change_projectdomain')}
+                                                            value={domain.provider_detail?.email || ''}
+                                                            onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), email: e.target.value })}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Phone</label>
+                                                        <input type="text" placeholder="+1..."
+                                                            disabled={!hasPermission('change_projectdomain')}
+                                                            value={domain.provider_detail?.phone || ''}
+                                                            onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), phone: e.target.value })}
+                                                            className={inputCls} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {hasPermission('view_projectserver') && formData.project_servers?.map((server: any, idx: number) => (
+                                <div key={idx} className="p-6 bg-indigo-500/5 border border-indigo-500/20 rounded-[2rem] space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-black text-indigo-500 uppercase tracking-widest">🖥️ Server #{idx + 1}</span>
+                                        {hasPermission('delete_projectserver') && (
+                                            <button type="button" onClick={() => removeItem('project_servers', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl"><Trash2 size={18} /></button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Server Name</label>
+                                            <input type="text" placeholder="e.g. AWS Lightsail"
+                                                disabled={!hasPermission('change_projectserver')}
+                                                value={server.name || ''} onChange={e => setNested('project_servers', idx, 'name', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Server Type</label>
+                                            <ProviderSelect
+                                                value={server.server_type ?? 'VPS'}
+                                                onChange={(val) => setNested('project_servers', idx, 'server_type', val)}
+                                                options={['VPS', 'Shared', 'Dedicated', 'Cloud']}
+                                                placeholder="Server Type..."
+                                                className={`${inputCls} ${!hasPermission('change_projectserver') ? 'opacity-60 pointer-events-none' : ''}`}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Accrued By</label>
+                                            <select
+                                                value={server.accrued_by || 'Extechnology'}
+                                                disabled={!hasPermission('change_projectserver')}
+                                                onChange={e => setNested('project_servers', idx, 'accrued_by', e.target.value)}
+                                                className={inputCls}
+                                            >
+                                                <option value="Extechnology">Extechnology</option>
+                                                <option value="Client">Client</option>
+                                                <option value="Third Party">Third Party</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Purchased From</label>
+                                            <ProviderSelect
+                                                value={server.purchased_from || ''}
+                                                onChange={(val) => setNested('project_servers', idx, 'purchased_from', val)}
+                                                options={['AWS', 'DigitalOcean', 'Google Cloud', 'Microsoft Azure', 'Linode', 'Vultr', 'Hostinger', 'Hetzner', 'OVHCloud', 'Contabo']}
+                                                placeholder="e.g. Amazon"
+                                                className={`${inputCls} ${!hasPermission('change_projectserver') ? 'opacity-60 pointer-events-none' : ''}`}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Purchase Date</label>
+                                            <input type="date"
+                                                disabled={!hasPermission('change_projectserver')}
+                                                value={server.purchase_date || ''} onChange={e => setNested('project_servers', idx, 'purchase_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className={`${labelCls} !mb-0`}>Expiration Date</label>
+                                                {hasPermission('change_projectserver') && (
+                                                    <div className="flex items-center gap-1">
+                                                        {[{ label: '6m', m: 6 }, { label: '1y', m: 12 }, { label: '2y', m: 24 }, { label: '3y', m: 36 }].map(opt => (
+                                                            <button key={opt.label} type="button" onClick={(e) => { e.stopPropagation(); const pDate = server.purchase_date || new Date().toISOString().split('T')[0]; const d = new Date(pDate); d.setUTCMonth(d.getUTCMonth() + opt.m); setNested('project_servers', idx, 'expiration_date', d.toISOString().split('T')[0]); }} className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 rounded-md font-bold transition-all">+{opt.label}</button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <input type="date"
+                                                disabled={!hasPermission('change_projectserver')}
+                                                value={server.expiration_date || ''} onChange={e => setNested('project_servers', idx, 'expiration_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Cost (₹)</label>
+                                            <input type="number" step="0.01" placeholder="0.00"
+                                                disabled={!hasPermission('change_projectserver')}
+                                                value={server.cost || ''} onChange={e => setNested('project_servers', idx, 'cost', e.target.value)}
+                                                className={`${inputCls} font-bold`} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Status</label>
+                                            <select disabled={!hasPermission('change_projectserver')} value={server.status || 'Active'} onChange={e => setNested('project_servers', idx, 'status', e.target.value)} className={inputCls}>
+                                                <option value="Active">Active</option>
+                                                <option value="Expired">Expired</option>
+                                                <option value="Pending">Pending</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className={`${labelCls} text-emerald-500 !mb-0`}>Payment Status</label>
+                                                {server.accrued_by === 'Extechnology' && (
+                                                    server.invoice_status === 'INVOICED' ? (
+                                                        <div className="flex items-center gap-1 text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20" title="Server has been invoiced">
+                                                            <FileText size={12} />
+                                                            <span className="text-[9px] font-black uppercase">Invoiced</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1 text-rose-500 bg-rose-500/5 px-2 py-0.5 rounded-md border border-rose-500/10" title="Server not yet invoiced">
+                                                            <X size={12} />
+                                                            <span className="text-[9px] font-black uppercase">Not Invoiced</span>
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <select disabled={!hasPermission('change_projectserver')} value={server.payment_status || 'UNPAID'} onChange={e => setNested('project_servers', idx, 'payment_status', e.target.value)} className={`${inputCls} flex-1 font-bold text-emerald-500`}>
+                                                    <option value="UNPAID">UNPAID</option>
+                                                    <option value="PARTIAL">PARTIAL</option>
+                                                    <option value="PAID">PAID</option>
+                                                </select>
+                                                {server.accrued_by === 'Extechnology' && server.invoice_status !== 'INVOICED' && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={!hasPermission('change_projectserver')}
+                                                        onClick={() => handleBillItem('server', server.name || 'Server', server.cost || 0, server.purchase_date, server.expiration_date, server.id)}
+                                                        className={`h-[46px] px-3 bg-emerald-500/10 text-emerald-500 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 ${hasPermission('change_projectserver') ? 'hover:bg-emerald-500/20' : 'opacity-60 cursor-not-allowed'}`}
+                                                        title="Generate Invoice"
+                                                    >
+                                                        <Receipt size={18} />
+                                                        <span className="text-[10px] font-black uppercase">Bill</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {server.accrued_by === 'Third Party' && (
+                                            <div className="lg:col-span-3 pt-4 border-t border-border/30">
+                                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                    🏢 Provider Details
+                                                </p>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Company Name</label>
+                                                        <input type="text" placeholder="e.g. DigitalOcean"
+                                                            disabled={!hasPermission('change_projectserver')}
+                                                            value={server.provider_detail?.company_name || ''}
+                                                            onChange={e => setNested('project_servers', idx, 'provider_detail', { ...(server.provider_detail || {}), company_name: e.target.value })}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Contact Person</label>
+                                                        <input type="text" placeholder="Manager Name"
+                                                            disabled={!hasPermission('change_projectserver')}
+                                                            value={server.provider_detail?.contact_person || ''}
+                                                            onChange={e => setNested('project_servers', idx, 'provider_detail', { ...(server.provider_detail || {}), contact_person: e.target.value })}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Email</label>
+                                                        <input type="email" placeholder="support@do.com"
+                                                            disabled={!hasPermission('change_projectserver')}
+                                                            value={server.provider_detail?.email || ''}
+                                                            onChange={e => setNested('project_servers', idx, 'provider_detail', { ...(server.provider_detail || {}), email: e.target.value })}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Phone</label>
+                                                        <input type="text" placeholder="+1..."
+                                                            disabled={!hasPermission('change_projectserver')}
+                                                            value={server.provider_detail?.phone || ''}
+                                                            onChange={e => setNested('project_servers', idx, 'provider_detail', { ...(server.provider_detail || {}), phone: e.target.value })}
+                                                            className={inputCls} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {hasPermission('view_projectexbot') && formData.project_exbots?.map((exbot: any, idx: number) => (
+                                <div key={idx} className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-[2rem] space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-black text-emerald-500 uppercase tracking-widest">🤖 Exbot #{idx + 1}</span>
+                                        {hasPermission('delete_projectexbot') && (
+                                            <button type="button" onClick={() => removeItem('project_exbots', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl"><Trash2 size={18} /></button>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>WhatsApp Number</label>
+                                            <input type="text" placeholder="+91..."
+                                                disabled={!hasPermission('change_projectexbot')}
+                                                value={exbot.whatsapp_number || ''} onChange={e => setNested('project_exbots', idx, 'whatsapp_number', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Plan Category</label>
+                                            <select disabled={!hasPermission('change_projectexbot')} value={exbot.plan_category || 'Premium'} onChange={e => setNested('project_exbots', idx, 'plan_category', e.target.value)} className={inputCls}>
+                                                <option value="Premium">Premium</option>
+                                                <option value="Standard">Standard</option>
+                                                <option value="Basic">Basic</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Rate (₹)</label>
+                                            <input type="number" step="0.01" placeholder="0.00"
+                                                disabled={!hasPermission('change_projectexbot')}
+                                                value={exbot.plan_rate || ''} onChange={e => setNested('project_exbots', idx, 'plan_rate', e.target.value)}
+                                                className={`${inputCls} font-bold text-emerald-500`} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Active Date</label>
+                                            <input type="date"
+                                                disabled={!hasPermission('change_projectexbot')}
+                                                value={exbot.plan_active_date || ''} onChange={e => setNested('project_exbots', idx, 'plan_active_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className={`${labelCls} !mb-0`}>Deactive Date</label>
+                                                {hasPermission('change_projectexbot') && (
+                                                    <div className="flex items-center gap-1">
+                                                        {[{ label: '1m', m: 1 }, { label: '6m', m: 6 }, { label: '1y', m: 12 }].map(opt => (
+                                                            <button key={opt.label} type="button" onClick={(e) => { e.stopPropagation(); const pDate = exbot.plan_active_date || new Date().toISOString().split('T')[0]; const d = new Date(pDate); d.setUTCMonth(d.getUTCMonth() + opt.m); setNested('project_exbots', idx, 'plan_deactive_date', d.toISOString().split('T')[0]); }} className="text-[9px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20 rounded-md font-bold transition-all">+{opt.label}</button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <input type="date"
+                                                disabled={!hasPermission('change_projectexbot')}
+                                                value={exbot.plan_deactive_date || ''} onChange={e => setNested('project_exbots', idx, 'plan_deactive_date', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Status</label>
+                                            <select disabled={!hasPermission('change_projectexbot')} value={exbot.status || 'Active'} onChange={e => setNested('project_exbots', idx, 'status', e.target.value)} className={inputCls}>
+                                                <option value="Active">Active</option>
+                                                <option value="Pending">Pending</option>
+                                                <option value="Expired">Expired</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className={`${labelCls} text-emerald-500 !mb-0`}>Payment Status</label>
+                                                {exbot.invoice_status === 'INVOICED' ? (
+                                                    <div className="flex items-center gap-1 text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20" title="Exbot has been invoiced">
+                                                        <FileText size={12} />
+                                                        <span className="text-[9px] font-black uppercase">Invoiced</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1 text-rose-500 bg-rose-500/5 px-2 py-0.5 rounded-md border border-rose-500/10" title="Exbot not yet invoiced">
+                                                        <X size={12} />
+                                                        <span className="text-[9px] font-black uppercase">Not Invoiced</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <select disabled={!hasPermission('change_projectexbot')} value={exbot.payment_status || 'UNPAID'} onChange={e => setNested('project_exbots', idx, 'payment_status', e.target.value)} className={`${inputCls} flex-1 font-bold text-emerald-500`}>
+                                                    <option value="UNPAID">UNPAID</option>
+                                                    <option value="PARTIAL">PARTIAL</option>
+                                                    <option value="PAID">PAID</option>
+                                                </select>
+                                                {exbot.invoice_status !== 'INVOICED' && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={!hasPermission('change_projectexbot')}
+                                                        onClick={() => handleBillItem('exbot', `Exbot: ${exbot.whatsapp_number}`, exbot.plan_rate || 0, exbot.plan_active_date, exbot.plan_deactive_date, exbot.id)}
+                                                        className={`h-[46px] px-3 bg-emerald-500/10 text-emerald-500 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 ${hasPermission('change_projectexbot') ? 'hover:bg-emerald-500/20' : 'opacity-60 cursor-not-allowed'}`}
+                                                        title="Generate Invoice"
+                                                    >
+                                                        <Receipt size={18} />
+                                                        <span className="text-[10px] font-black uppercase">Bill</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="lg:col-span-2 space-y-1">
+                                            <label className={labelCls}>Description</label>
+                                            <input type="text" placeholder="Short notes..."
+                                                disabled={!hasPermission('change_projectexbot')}
+                                                value={exbot.description || ''} onChange={e => setNested('project_exbots', idx, 'description', e.target.value)}
+                                                className={inputCls} />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </FormSection>
+                )}
+
+
+
+                {/* ── 7. Project Team ── */}
+                {hasPermission('view_projectteam') && (
+                    <FormSection
+                        title="Project Team"
+                        icon={<Users size={22} />}
+                        iconColor="text-violet-500"
+                        bgColor="bg-violet-500/10"
+                        action={
+                            hasPermission('add_projectteam') ? (
+                                <button type="button"
+                                    onClick={() => addItem('project_teams', { team: '', status: 'Pending', payment_status: 'UNPAID', deadline: '', actual_end_date: '', description: '', members: [] })}
+                                    className="text-xs flex items-center gap-1.5 px-4 py-2 bg-violet-500/10 text-violet-500 rounded-xl hover:bg-violet-500/20 transition-all font-bold">
+                                    <Plus size={14} /> Add Team Group
+                                </button>
+                            ) : null
+                        }>
+                        <div className="space-y-6">
+                            {formData.project_teams?.length === 0 && (
+                                <div className="text-center py-12 bg-muted/5 rounded-[2.5rem] border border-dashed border-border">
+                                    <div className="w-16 h-16 bg-muted/10 rounded-3xl flex items-center justify-center mx-auto mb-4 text-muted">
+                                        <Users size={32} />
+                                    </div>
+                                    <h4 className="text-lg font-black text-foreground italic uppercase">No Team Groups</h4>
+                                    <p className="text-muted text-xs font-medium mt-1">
+                                        {hasPermission('add_projectteam') ? 'Click the button above to assign a team to this project' : 'You do not have permission to add teams'}
+                                    </p>
+                                </div>
+                            )}
+                            {formData.project_teams?.map((team: any, tIdx: number) => (
+                                <div key={tIdx} className="border border-border rounded-[2rem] bg-muted/5">
+                                    <div className="p-5 flex flex-wrap items-center gap-4 border-b border-border/50">
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Select Team</label>
+                                            <div className="flex items-center gap-2">
+                                                <SearchableTeamSelect
+                                                    value={team.team}
+                                                    disabled={!hasPermission('change_projectteam')}
+                                                    onChange={async (val) => {
+                                                        let selectedTeam = teams.find(t => t.id === val);
+                                                        if (val && !selectedTeam) {
+                                                            try {
+                                                                selectedTeam = await getTeam(val);
+                                                            } catch (err) {
+                                                                console.error("Failed to fetch team details:", err);
+                                                            }
+                                                        }
+                                                        setFormData((p: any) => {
+                                                            const pTeams = [...p.project_teams];
+                                                            const pt = { ...pTeams[tIdx], team: val };
+
+                                                            if (selectedTeam && selectedTeam.members) {
+                                                                const currentMembers = pt.members || [];
+                                                                const existingEmployeeIds = new Set(currentMembers.map((m: any) => m.employee));
+
+                                                                const membersToAdd = selectedTeam.members
+                                                                    .map((id: number, idx: number) => {
+                                                                        if (existingEmployeeIds.has(id)) return null;
+                                                                        const found = (users || []).find(u => u.id === id);
+                                                                        if (found) return found;
+
+                                                                        const name = (selectedTeam.member_names && selectedTeam.member_names[idx]) || `User ${id}`;
+                                                                        return { id, username: name, first_name: name, last_name: '', designation: '' };
+                                                                    })
+                                                                    .filter(Boolean);
+
+                                                                const newMembers = membersToAdd.map((user: any) => ({
+                                                                    role: user.designation || '',
+                                                                    cost: '0.00',
+                                                                    allocated_days: 0,
+                                                                    actual_days_spent: 0,
+                                                                    employee: user.id,
+                                                                    employee_name: user.first_name || user.username || `ID: ${user.id}`,
+                                                                    start_date: '',
+                                                                    end_date: '',
+                                                                    status: 'Pending',
+                                                                    notes: `Added from ${selectedTeam.name}`
+                                                                }));
+                                                                pt.members = [...currentMembers, ...newMembers];
+                                                            }
+
+                                                            pTeams[tIdx] = pt;
+                                                            return { ...p, project_teams: pTeams };
+                                                        });
+                                                    }}
+                                                    className="w-48"
+                                                />
+                                                {hasPermission('add_projectteam') && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setTeamAssignmentTarget({ type: 'project', idx: tIdx });
+                                                            setIsQuickTeamModalOpen(true);
+                                                        }}
+                                                        className="p-2 bg-violet-500/10 text-violet-500 rounded-xl hover:bg-violet-500/20 transition-all border border-violet-500/20"
+                                                        title="Create New Team"
+                                                    >
+                                                        <Plus size={16} />
+                                                    </button>
+                                                )}
+                                                {hasPermission('change_projectteam') && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => syncProjectTeamMembers(tIdx)}
+                                                        className="p-2 bg-violet-500/10 text-violet-500 rounded-xl hover:bg-violet-500/20 transition-all border border-violet-500/20"
+                                                        title="Sync/Reload Team Members"
+                                                    >
+                                                        <RefreshCcw size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Status</label>
+                                            <select value={team.status || 'Pending'}
+                                                disabled={!hasPermission('change_projectteam')}
+                                                onChange={e => setNested('project_teams', tIdx, 'status', e.target.value)}
+                                                className={`${smallInputCls} w-32`}>
+                                                <option value="Pending">Pending</option>
+                                                <option value="Progressing">Progressing</option>
+                                                <option value="Completed">Completed</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <div className="flex items-center justify-between mb-1.5">
+                                                <label className={`${labelCls} text-emerald-500 !mb-0`}>Payment Status</label>
+                                                {team.invoice_status === 'INVOICED' ? (
+                                                    <div className="flex items-center gap-1 text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20" title="Team has been invoiced">
+                                                        <FileText size={12} />
+                                                        <span className="text-[9px] font-black uppercase">Invoiced</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1 text-rose-500 bg-rose-500/5 px-2 py-0.5 rounded-md border border-rose-500/10" title="Team not yet invoiced">
+                                                        <X size={12} />
+                                                        <span className="text-[9px] font-black uppercase">Not Invoiced</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <select value={team.payment_status || 'UNPAID'}
+                                                    disabled={!hasPermission('change_projectteam')}
+                                                    onChange={e => setNested('project_teams', tIdx, 'payment_status', e.target.value)}
+                                                    className={`${smallInputCls} flex-1 h-[46px] font-bold text-emerald-500`}>
+                                                    <option value="UNPAID">UNPAID</option>
+                                                    <option value="PAID">PAID</option>
+                                                </select>
+                                                {team.invoice_status !== 'INVOICED' && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={!hasPermission('change_projectteam')}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (!team.id) {
+                                                                alert('Please save the project first to generate a bill for this team.');
+                                                                return;
+                                                            }
+                                                            handleBillItem('team', team.team_detail?.name || 'Project Team', team.cost || 0, '', '', team.id);
+                                                        }}
+                                                        className={`h-[46px] px-3 bg-emerald-500/10 text-emerald-500 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 ${hasPermission('change_projectteam') ? 'hover:bg-emerald-500/20' : 'opacity-60 cursor-not-allowed'}`}
+                                                        title="Generate Invoice"
+                                                    >
+                                                        <DollarSign size={18} />
+                                                        <span className="text-[10px] font-black uppercase">Bill</span>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={`${labelCls} text-emerald-500`}>Cost (₹)</label>
+                                            <input type="number" step="0.01" placeholder="0.00" value={team.cost || ''}
+                                                disabled={!hasPermission('change_projectteam')}
+                                                onChange={e => setNested('project_teams', tIdx, 'cost', e.target.value)}
+                                                className={`${smallInputCls} w-32 font-bold text-emerald-500`} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Team Allocation Start</label>
+                                            <input type="date" value={team.start_date || ''}
+                                                disabled={!hasPermission('change_projectteam')}
+                                                onChange={e => setNested('project_teams', tIdx, 'start_date', e.target.value)}
+                                                className={`${smallInputCls} w-40`} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Team Allocation End</label>
+                                            <input type="date" value={team.end_date || ''}
+                                                disabled={!hasPermission('change_projectteam')}
+                                                onChange={e => setNested('project_teams', tIdx, 'end_date', e.target.value)}
+                                                className={`${smallInputCls} w-40`} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={`${labelCls} text-rose-500`}>Deadline</label>
+                                            <input type="date" value={team.deadline || ''}
+                                                disabled={!hasPermission('change_projectteam')}
+                                                onChange={e => setNested('project_teams', tIdx, 'deadline', e.target.value)}
+                                                className={`${smallInputCls} w-40 text-rose-500 font-bold`} />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className={`${labelCls} text-emerald-500`}>Actual End Date</label>
+                                            <input type="date" value={team.actual_end_date || ''}
+                                                disabled={!hasPermission('change_projectteam')}
+                                                onChange={e => setNested('project_teams', tIdx, 'actual_end_date', e.target.value)}
+                                                className={`${smallInputCls} w-40 text-emerald-500`} />
+                                        </div>
+                                        {hasPermission('delete_projectteam') && (
+                                            <button type="button" onClick={() => removeItem('project_teams', tIdx)} className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-2xl ml-auto">
+                                                <Trash2 size={18} />
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="px-6 pb-5">
+                                        <div className="space-y-1">
+                                            <label className={labelCls}>Team Description / Requirements</label>
+                                            <textarea
+                                                placeholder="Specify team-specific requirements or notes..."
+                                                value={team.description || ''}
+                                                disabled={!hasPermission('change_projectteam')}
+                                                onChange={e => setNested('project_teams', tIdx, 'description', e.target.value)}
+                                                className={`${inputCls} min-h-[80px] py-3 text-sm`}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="p-5 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <p className={labelCls}>Members</p>
+                                            {hasPermission('add_projectteam') && (
+                                                <button type="button" onClick={() => addTeamMember(tIdx)}
+                                                    className="text-[11px] font-bold text-primary uppercase flex items-center gap-1 hover:bg-primary/10 px-3 py-1.5 rounded-xl transition-all">
+                                                    <Plus size={13} /> Add Member
+                                                </button>
+                                            )}
+                                        </div>
+                                        {team.members?.map((m: any, mIdx: number) => (
+                                            <div key={mIdx} className="bg-card p-5 rounded-2xl border border-border space-y-4">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Role</label>
+                                                        <select
+                                                            value={m.role}
+                                                            disabled={!hasPermission('change_projectteam')}
+                                                            onChange={e => setTeamMember(tIdx, mIdx, 'role', e.target.value)}
+                                                            className={inputCls}
+                                                        >
+                                                            <option value="">Select Role...</option>
+                                                            {COMMON_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                                                            {!COMMON_ROLES.includes(m.role) && m.role && <option value={m.role}>{m.role}</option>}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Cost (₹)</label>
+                                                        <input type="number" step="0.01" placeholder="0.00" value={m.cost}
+                                                            disabled={!hasPermission('change_projectteam')}
+                                                            onChange={e => setTeamMember(tIdx, mIdx, 'cost', e.target.value)}
+                                                            className={`${inputCls} text-emerald-500 font-bold`} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Employee</label>
+                                                        <SearchableUserSelect
+                                                            value={m.employee || ''}
+                                                            onChange={val => setTeamMember(tIdx, mIdx, 'employee', val)}
+                                                            disabled={!hasPermission('change_projectteam')}
+                                                            placeholder="Search Employee..."
+                                                            className="w-full"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Allocated Days</label>
+                                                        <input type="number" placeholder="0" value={m.allocated_days || 0}
+                                                            disabled={!hasPermission('change_projectteam')}
+                                                            onChange={e => setTeamMember(tIdx, mIdx, 'allocated_days', parseInt(e.target.value))}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Actual Days Spent</label>
+                                                        <input type="number" placeholder="0" value={m.actual_days_spent || 0}
+                                                            disabled={!hasPermission('change_projectteam')}
+                                                            onChange={e => setTeamMember(tIdx, mIdx, 'actual_days_spent', parseInt(e.target.value))}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Status</label>
+                                                        <select value={m.status || 'Pending'}
+                                                            disabled={!hasPermission('change_projectteam')}
+                                                            onChange={e => setTeamMember(tIdx, mIdx, 'status', e.target.value)}
+                                                            className={inputCls}>
+                                                            <option value="Pending">Pending</option>
+                                                            <option value="Progressing">Progressing</option>
+                                                            <option value="Completed">Completed</option>
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>Start Date</label>
+                                                        <input type="date" value={m.start_date || ''}
+                                                            disabled={!hasPermission('change_projectteam')}
+                                                            onChange={e => setTeamMember(tIdx, mIdx, 'start_date', e.target.value)}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className={labelCls}>End Date</label>
+                                                        <input type="date" value={m.end_date || ''}
+                                                            disabled={!hasPermission('change_projectteam')}
+                                                            onChange={e => setTeamMember(tIdx, mIdx, 'end_date', e.target.value)}
+                                                            className={inputCls} />
+                                                    </div>
+                                                    <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+                                                        <label className={labelCls}>Notes</label>
+                                                        <input type="text" placeholder="e.g. Handling UI components" value={m.notes || ''}
+                                                            disabled={!hasPermission('change_projectteam')}
+                                                            onChange={e => setTeamMember(tIdx, mIdx, 'notes', e.target.value)}
+                                                            className={inputCls} />
+                                                    </div>
+                                                </div>
+                                                {hasPermission('delete_projectteam') && (
+                                                    <div className="flex justify-end">
+                                                        <button type="button" onClick={() => removeTeamMember(tIdx, mIdx)}
+                                                            className="text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
+                                                            <Trash2 size={14} /> Remove Member
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -1507,1060 +2924,168 @@ const ProjectForm: React.FC = () => {
                     </FormSection>
                 )}
 
-                                {/* ── 4. Client & Address ── */}
-                                {(hasPermission('view_projectclient') || hasPermission('view_projectbusinessaddress')) && (
-                                    <FormSection title="Client & Address" icon={<MapPin size={22} />} iconColor="text-rose-500" bgColor="bg-rose-500/10"
-                                        action={
-                                            hasPermission('add_projectclient') ? (
-                                                <button type="button" onClick={() => addItem('project_clients', blankClient())}
-                                                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-500/20 transition-all font-bold">
-                                                    <Plus size={14} /> Add Client
-                                                </button>
-                                            ) : null
-                                        }>
-                                        {hasPermission('view_projectclient') && (
-                                            <div className="space-y-8">
-                                                {formData.project_clients?.map((client: any, idx: number) => (
-                                                    <div key={idx} className={`space-y-6 ${idx > 0 ? 'pt-8 border-t border-border' : ''}`}>
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-xs font-black text-rose-500 uppercase tracking-widest">Client Entry #{idx + 1}</span>
-                                                            {idx > 0 && hasPermission('delete_projectclient') && (
-                                                                <button type="button" onClick={() => removeItem('project_clients', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl">
-                                                                    <Trash2 size={18} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                            {[
-                                                                { key: 'company_name', label: 'Company Name', placeholder: 'Acme Corp' },
-                                                                { key: 'contact_person', label: 'Contact Person', placeholder: 'John Smith' },
-                                                                { key: 'email', label: 'Email', placeholder: 'contact@company.com' },
-                                                                { key: 'phone', label: 'Phone', placeholder: '+91 98765 43210' },
-                                                            ].map(({ key, label, placeholder }) => (
-                                                                <div key={key} className="space-y-2">
-                                                                    <label className={labelCls}>{label}</label>
-                                                                    <input
-                                                                        type="text" placeholder={placeholder}
-                                                                        value={client[key] || ''}
-                                                                        disabled={!hasPermission('change_projectclient')}
-                                                                        onChange={e => setNested('project_clients', idx, key, e.target.value)}
-                                                                        className={inputCls}
-                                                                    />
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    {/* Business Addresses */}
-                                    {hasPermission('view_projectbusinessaddress') && (
-                                        <div className="mt-8 space-y-4">
-                                            <div className="flex items-center justify-between">
-                                                <label className={labelCls}>Business Addresses</label>
-                                                {hasPermission('add_projectbusinessaddress') && (!formData.project_business_addresses || formData.project_business_addresses.length === 0) && (
-                                                    <button type="button"
-                                                        onClick={() => addItem('project_business_addresses', blankAddress())}
-                                                        className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-500/20 transition-all font-bold">
-                                                        <Plus size={14} /> Add Address
-                                                    </button>
-                                                )}
-                                            </div>
-                                            {formData.project_business_addresses?.map((addr: any, idx: number) => (
-                                                <div key={idx} className="p-6 bg-muted/5 border border-border rounded-[2rem] space-y-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-4">
-                                                            <span className="text-[11px] font-black text-rose-500 uppercase tracking-widest">📍 Address #{idx + 1}</span>
-                                                            {hasPermission('change_projectbusinessaddress') && (
-                                                                <AddressPicker
-                                                                    selectedId={addr.id}
-                                                                    onSelect={(selected) => {
-                                                                        setFormData((p: any) => {
-                                                                            const arr = [...(p.project_business_addresses || [])];
-                                                                            arr[idx] = { ...arr[idx], ...selected };
-                                                                            return { ...p, project_business_addresses: arr };
-                                                                        });
-                                                                    }} />
-                                                            )}
-                                                        </div>
-                                                        {hasPermission('delete_projectbusinessaddress') && (
-                                                            <button type="button" onClick={() => removeItem('project_business_addresses', idx)}
-                                                                className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl">
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                        {[
-                                                            { key: 'attention_name', label: 'Attention Name' },
-                                                            { key: 'legal_name', label: 'Legal Name' },
-                                                            { key: 'email', label: 'Billing Email' },
-                                                            { key: 'phone', label: 'Billing Phone' },
-                                                            { key: 'gst_number', label: 'GST Number' },
-                                                            { key: 'pan_number', label: 'PAN Number' },
-                                                            { key: 'logo', label: 'Logo URL' },
-                                                            { key: 'unit_or_floor', label: 'Unit / Floor' },
-                                                            { key: 'building_name', label: 'Building Name' },
-                                                            { key: 'plot_number', label: 'Plot Number' },
-                                                            { key: 'street_name', label: 'Street Name' },
-                                                            { key: 'landmark', label: 'Landmark' },
-                                                            { key: 'locality', label: 'Locality' },
-                                                            { key: 'city', label: 'City' },
-                                                            { key: 'district', label: 'District' },
-                                                            { key: 'state', label: 'State' },
-                                                            { key: 'pin_code', label: 'PIN Code' },
-                                                            { key: 'country', label: 'Country' },
-                                                        ].map(({ key, label }) => {
-                                                            if (key === 'logo') {
-                                                                return (
-                                                                    <div key={key} className="space-y-1">
-                                                                        <label className={labelCls}>{label}</label>
-                                                                        <div className="flex items-center gap-4">
-                                                                            <div className="flex-1 relative">
-                                                                                <input
-                                                                                    type="file"
-                                                                                    accept="image/*"
-                                                                                    disabled={!hasPermission('change_projectbusinessaddress')}
-                                                                                    onChange={(e) => {
-                                                                                        const file = e.target.files?.[0];
-                                                                                        if (file) {
-                                                                                            setNested('project_business_addresses', idx, 'logo', file);
-                                                                                        }
-                                                                                    }}
-                                                                                    className="hidden"
-                                                                                    id={`logo-upload-${idx}`}
-                                                                                />
-                                                                                <label
-                                                                                    htmlFor={`logo-upload-${idx}`}
-                                                                                    className={`flex items-center justify-center gap-2 px-4 py-2.5 bg-background border border-dashed border-border rounded-xl text-muted text-xs font-bold transition-all w-full ${hasPermission('change_projectbusinessaddress') ? 'cursor-pointer hover:border-primary/50 hover:bg-primary/5' : 'cursor-not-allowed opacity-60'}`}
-                                                                                >
-                                                                                    {addr.logo ? 'Change Logo' : 'Upload Logo'}
-                                                                                </label>
-                                                                            </div>
-                                                                            {addr.logo && (
-                                                                                <div className="relative group">
-                                                                                    <img src={typeof addr.logo === 'string' ? addr.logo : URL.createObjectURL(addr.logo as any)} alt="Preview" className="w-10 h-10 object-contain rounded-lg border border-border bg-white" />
-                                                                                    <a
-                                                                                        href={typeof addr.logo === 'string' ? addr.logo : URL.createObjectURL(addr.logo as any)}
-                                                                                        target="_blank"
-                                                                                        rel="noopener noreferrer"
-                                                                                        className="absolute -bottom-2 -right-2 bg-primary text-white rounded-full p-1 shadow-lg hover:scale-110 transition-transform"
-                                                                                    >
-                                                                                        <ChevronRight size={10} />
-                                                                                    </a>
-                                                                                    {hasPermission('change_projectbusinessaddress') && (
-                                                                                        <button
-                                                                                            type="button"
-                                                                                            onClick={() => setNested('project_business_addresses', idx, 'logo', '')}
-                                                                                            className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                                        >
-                                                                                            <X size={10} />
-                                                                                        </button>
-                                                                                    )}
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            }
-                                                            return (
-                                                                <div key={key} className="space-y-1">
-                                                                    <label className={labelCls}>{label}</label>
-                                                                    <input type="text" placeholder={label}
-                                                                        value={addr[key] || ''} onChange={e => setNested('project_business_addresses', idx, key, e.target.value)}
-                                                                        required={key === 'legal_name'}
-                                                                        disabled={!hasPermission('change_projectbusinessaddress')}
-                                                                        className={inputCls} />
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </FormSection>
+                {/* ── 7. Associated Services ── */}
+                {hasPermission('view_projectservice') && (
+                    <FormSection
+                        title="Associated Services"
+                        icon={<Layers size={22} />}
+                        iconColor="text-purple-500"
+                        bgColor="bg-purple-500/10"
+                        defaultOpen={true}
+                        action={
+                            hasPermission('add_projectservice') ? (
+                                <button type="button"
+                                    onClick={() => addItem('services', newServiceTemplate())}
+                                    className="text-xs flex items-center gap-1.5 px-4 py-2 bg-purple-500/10 text-purple-500 rounded-xl hover:bg-purple-500/20 transition-all font-bold">
+                                    <Plus size={14} /> Service
+                                </button>
+                            ) : null
+                        }>
+                        <div className="space-y-6">
+                            {formData.services.length === 0 && (
+                                <p className="text-center text-muted text-sm py-6">No associated services yet. Click "+ Service" to add one.</p>
                             )}
-
-                                {hasPermission('view_projectdocument') && (
-                                    <FormSection
-                                        title="Project Documents"
-                                        icon={<FileText size={22} />}
-                                        iconColor="text-orange-500"
-                                        action={
-                                            hasPermission('add_projectdocument') ? (
-                                                <button type="button"
-                                                    onClick={() => addItem('project_documents', blankDocument())}
-                                                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 text-orange-500 rounded-xl hover:bg-orange-500/20 transition-all font-bold">
-                                                    <Plus size={14} /> Add Document
-                                                </button>
-                                            ) : null
-                                        }
-                                    >
-                                        <div className="space-y-4">
-                                            {formData.project_documents.map((doc: any, idx: number) => (
-                                                <div key={idx} className="p-6 bg-muted/5 rounded-3xl border border-border relative group animate-in slide-in-from-top-4 duration-300">
-                                                    {hasPermission('delete_projectdocument') && (
-                                                        <button type="button" onClick={() => removeItem('project_documents', idx)}
-                                                            className="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-all shadow-lg">
-                                                            <X size={14} />
-                                                        </button>
-                                                    )}
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                                        <div className="space-y-2">
-                                                            <label className={labelCls}>Document Name</label>
-                                                            <input type="text" placeholder="e.g. Project Charter"
-                                                                value={doc.name} onChange={e => setNested('project_documents', idx, 'name', e.target.value)}
-                                                                disabled={!hasPermission('change_projectdocument')}
-                                                                className={inputCls} />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className={labelCls}>Description</label>
-                                                            <input type="text" placeholder="Short description..."
-                                                                value={doc.description} onChange={e => setNested('project_documents', idx, 'description', e.target.value)}
-                                                                disabled={!hasPermission('change_projectdocument')}
-                                                                className={inputCls} />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className={labelCls}>Upload Document</label>
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="flex-1 relative">
-                                                                    <input
-                                                                        type="file"
-                                                                        disabled={!hasPermission('change_projectdocument')}
-                                                                        onChange={(e) => {
-                                                                            const file = e.target.files?.[0];
-                                                                            if (file) {
-                                                                                setNested('project_documents', idx, 'document', file);
-                                                                            }
-                                                                        }}
-                                                                        className="hidden"
-                                                                        id={`doc-upload-${idx}`}
-                                                                    />
-                                                                    <label
-                                                                        style={{ opacity: hasPermission('change_projectdocument') ? 1 : 0.5, cursor: hasPermission('change_projectdocument') ? 'pointer' : 'not-allowed' }}
-                                                                        htmlFor={hasPermission('change_projectdocument') ? `doc-upload-${idx}` : undefined}
-                                                                        className="flex items-center justify-center gap-2 px-4 py-3 bg-background border border-dashed border-border rounded-2xl text-muted text-sm font-bold hover:border-orange-500/50 hover:bg-orange-500/5 transition-all w-full"
-                                                                    >
-                                                                        {doc.document ? 'Change File' : 'Choose File'}
-                                                                    </label>
-                                                                </div>
-                                                                {doc.document && (
-                                                                    <a
-                                                                        href={typeof doc.document === 'string' ? doc.document : URL.createObjectURL(doc.document as any)}
-                                                                        target="_blank"
-                                                                        rel="noopener noreferrer"
-                                                                        className="bg-emerald-500/10 text-emerald-500 p-2.5 rounded-2xl border border-emerald-500/20 hover:bg-emerald-500/20 transition-all flex items-center gap-2 group/view"
-                                                                    >
-                                                                        <FileText size={20} />
-                                                                        <span className="text-[10px] font-bold uppercase tracking-widest hidden group-hover/view:inline">View</span>
-                                                                    </a>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {formData.project_documents.length === 0 && (
-                                                <div className="text-center py-12 bg-muted/5 rounded-[2.5rem] border border-dashed border-border">
-                                                    <div className="w-16 h-16 bg-muted/10 rounded-3xl flex items-center justify-center mx-auto mb-4 text-muted">
-                                                        <FileText size={32} />
-                                                    </div>
-                                                    <h4 className="text-lg font-black text-foreground italic uppercase">No Documents Attached</h4>
-                                                    <p className="text-muted text-xs font-medium mt-1">
-                                                        {hasPermission('add_projectdocument') ? 'Click the button above to add project documentation' : 'You do not have permission to add documents'}
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </FormSection>
-                                )}
-
-                                {/* ── 5. Infrastructure ── */}
-                                {(hasPermission('view_projectdomain') || hasPermission('view_projectserver')) && (
-                                    <FormSection
-                                        title="Infrastructure"
-                                    icon={<Server size={22} />}
-                                    iconColor="text-blue-500"
-                                    bgColor="bg-blue-500/10"
-                                    action={
-                                        <div className="flex gap-2">
-                                            {hasPermission('add_projectdomain') && (
-                                                <button type="button"
-                                                    onClick={() => addItem('project_domains', { name: '', accrued_by: 'Extechnology', purchased_from: '', purchase_date: '', expiration_date: '', status: 'Active', cost: '0.00' })}
-                                                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 text-blue-500 rounded-xl hover:bg-blue-500/20 transition-all font-bold">
-                                                    <Plus size={14} /> Domain
-                                                </button>
-                                            )}
-                                            {hasPermission('add_projectserver') && (
-                                                <button type="button"
-                                                    onClick={() => addItem('project_servers', { name: '', server_type: 'VPS', accrued_by: 'Extechnology', purchased_from: '', purchase_date: '', expiration_date: '', status: 'Active', cost: '0.00' })}
-                                                    className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 text-indigo-500 rounded-xl hover:bg-indigo-500/20 transition-all font-bold">
-                                                    <Plus size={14} /> Server
-                                                </button>
-                                            )}
-                                        </div>
-                                    }>
-                                    <div className="space-y-6">
-                                        {formData.project_domains.length === 0 && formData.project_servers.length === 0 && (
-                                            <p className="text-center text-muted text-sm py-6">No domains or servers added yet.</p>
-                                        )}
-                                        {hasPermission('view_projectdomain') && formData.project_domains?.map((domain: any, idx: number) => (
-                                            <div key={idx} className="p-6 bg-blue-500/5 border border-blue-500/20 rounded-[2rem] space-y-4">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[11px] font-black text-blue-500 uppercase tracking-widest">🌐 Domain #{idx + 1}</span>
-                                                    {hasPermission('delete_projectdomain') && (
-                                                        <button type="button" onClick={() => removeItem('project_domains', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl"><Trash2 size={18} /></button>
-                                                    )}
-                                                </div>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Domain Name</label>
-                                                        <input type="text" placeholder="e.g. mycompany.com"
-                                                            disabled={!hasPermission('change_projectdomain')}
-                                                            value={domain.name || ''} onChange={e => setNested('project_domains', idx, 'name', e.target.value)}
-                                                            className={inputCls} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Accrued By</label>
-                                                        <select
-                                                            value={domain.accrued_by || 'Extechnology'}
-                                                            disabled={!hasPermission('change_projectdomain')}
-                                                            onChange={e => setNested('project_domains', idx, 'accrued_by', e.target.value)}
-                                                            className={inputCls}
-                                                        >
-                                                            <option value="Extechnology">Extechnology</option>
-                                                            <option value="Client">Client</option>
-                                                            <option value="Third Party">Third Party</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Purchased From</label>
-                                                        <ProviderSelect
-                                                            value={domain.purchased_from || ''}
-                                                            onChange={(val) => setNested('project_domains', idx, 'purchased_from', val)}
-                                                            options={['GoDaddy', 'Namecheap', 'Hostinger', 'Cloudflare', 'Google Domains', 'Porkbun', 'Bluehost', 'Domain.com', 'Network Solutions', 'BigRock']}
-                                                            placeholder="e.g. GoDaddy"
-                                                            className={`${inputCls} ${!hasPermission('change_projectdomain') ? 'opacity-60 pointer-events-none' : ''}`}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Purchase Date</label>
-                                                        <input type="date"
-                                                            disabled={!hasPermission('change_projectdomain')}
-                                                            value={domain.purchase_date || ''} onChange={e => setNested('project_domains', idx, 'purchase_date', e.target.value)}
-                                                            className={inputCls} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Expiration Date</label>
-                                                        <input type="date"
-                                                            disabled={!hasPermission('change_projectdomain')}
-                                                            value={domain.expiration_date || ''} onChange={e => setNested('project_domains', idx, 'expiration_date', e.target.value)}
-                                                            className={inputCls} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Cost (₹)</label>
-                                                        <input type="number" step="0.01" placeholder="0.00"
-                                                            disabled={!hasPermission('change_projectdomain')}
-                                                            value={domain.cost || ''} onChange={e => setNested('project_domains', idx, 'cost', e.target.value)}
-                                                            className={`${inputCls} font-bold`} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Status</label>
-                                                        <select disabled={!hasPermission('change_projectdomain')} value={domain.status || 'Active'} onChange={e => setNested('project_domains', idx, 'status', e.target.value)} className={inputCls}>
-                                                            <option value="Active">Active</option>
-                                                            <option value="Expired">Expired</option>
-                                                            <option value="Pending">Pending</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={`${labelCls} text-emerald-500`}>Payment Status</label>
-                                                        <div className="flex items-center gap-2">
-                                                            <select disabled={!hasPermission('change_projectdomain')} value={domain.payment_status || 'UNPAID'} onChange={e => setNested('project_domains', idx, 'payment_status', e.target.value)} className={`${inputCls} flex-1 font-bold text-emerald-500`}>
-                                                                <option value="UNPAID">UNPAID</option>
-                                                                <option value="PARTIAL">PARTIAL</option>
-                                                                <option value="PAID">PAID</option>
-                                                            </select>
-                                                            <button
-                                                                type="button"
-                                                                disabled={!hasPermission('change_projectdomain')}
-                                                                onClick={() => handleBillItem('domain', domain.name || 'Domain', domain.cost || 0, domain.purchase_date, domain.expiration_date, domain.id)}
-                                                                className={`h-[46px] px-3 bg-emerald-500/10 text-emerald-500 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 ${hasPermission('change_projectdomain') ? 'hover:bg-emerald-500/20' : 'opacity-60 cursor-not-allowed'}`}
-                                                                title="Generate Invoice"
-                                                            >
-                                                                <Receipt size={18} />
-                                                                <span className="text-[10px] font-black uppercase">Bill</span>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    {domain.accrued_by === 'Third Party' && (
-                                                        <div className="lg:col-span-3 pt-4 border-t border-border/30">
-                                                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                                                🏢 Provider Details
-                                                            </p>
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                                <div className="space-y-1">
-                                                                    <label className={labelCls}>Company Name</label>
-                                                                    <input type="text" placeholder="e.g. GoDaddy Inc."
-                                                                        disabled={!hasPermission('change_projectdomain')}
-                                                                        value={domain.provider_detail?.company_name || ''}
-                                                                        onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), company_name: e.target.value })}
-                                                                        className={inputCls} />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className={labelCls}>Contact Person</label>
-                                                                    <input type="text" placeholder="Manager Name"
-                                                                        disabled={!hasPermission('change_projectdomain')}
-                                                                        value={domain.provider_detail?.contact_person || ''}
-                                                                        onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), contact_person: e.target.value })}
-                                                                        className={inputCls} />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className={labelCls}>Email</label>
-                                                                    <input type="email" placeholder="provider@email.com"
-                                                                        disabled={!hasPermission('change_projectdomain')}
-                                                                        value={domain.provider_detail?.email || ''}
-                                                                        onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), email: e.target.value })}
-                                                                        className={inputCls} />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className={labelCls}>Phone</label>
-                                                                    <input type="text" placeholder="+1..."
-                                                                        disabled={!hasPermission('change_projectdomain')}
-                                                                        value={domain.provider_detail?.phone || ''}
-                                                                        onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), phone: e.target.value })}
-                                                                        className={inputCls} />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {hasPermission('view_projectserver') && formData.project_servers?.map((server: any, idx: number) => (
-                                            <div key={idx} className="p-6 bg-indigo-500/5 border border-indigo-500/20 rounded-[2rem] space-y-4">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[11px] font-black text-indigo-500 uppercase tracking-widest">🖥️ Server #{idx + 1}</span>
-                                                    {hasPermission('delete_projectserver') && (
-                                                        <button type="button" onClick={() => removeItem('project_servers', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl"><Trash2 size={18} /></button>
-                                                    )}
-                                                </div>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Server Name</label>
-                                                        <input type="text" placeholder="e.g. AWS Lightsail"
-                                                            disabled={!hasPermission('change_projectserver')}
-                                                            value={server.name || ''} onChange={e => setNested('project_servers', idx, 'name', e.target.value)}
-                                                            className={inputCls} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Server Type</label>
-                                                        <ProviderSelect
-                                                            value={server.server_type ?? 'VPS'}
-                                                            onChange={(val) => setNested('project_servers', idx, 'server_type', val)}
-                                                            options={['VPS', 'Shared', 'Dedicated', 'Cloud']}
-                                                            placeholder="Server Type..."
-                                                            className={`${inputCls} ${!hasPermission('change_projectserver') ? 'opacity-60 pointer-events-none' : ''}`}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Accrued By</label>
-                                                        <select
-                                                            value={server.accrued_by || 'Extechnology'}
-                                                            disabled={!hasPermission('change_projectserver')}
-                                                            onChange={e => setNested('project_servers', idx, 'accrued_by', e.target.value)}
-                                                            className={inputCls}
-                                                        >
-                                                            <option value="Extechnology">Extechnology</option>
-                                                            <option value="Client">Client</option>
-                                                            <option value="Third Party">Third Party</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Purchased From</label>
-                                                        <ProviderSelect
-                                                            value={server.purchased_from || ''}
-                                                            onChange={(val) => setNested('project_servers', idx, 'purchased_from', val)}
-                                                            options={['AWS', 'DigitalOcean', 'Google Cloud', 'Microsoft Azure', 'Linode', 'Vultr', 'Hostinger', 'Hetzner', 'OVHCloud', 'Contabo']}
-                                                            placeholder="e.g. Amazon"
-                                                            className={`${inputCls} ${!hasPermission('change_projectserver') ? 'opacity-60 pointer-events-none' : ''}`}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Purchase Date</label>
-                                                        <input type="date"
-                                                            disabled={!hasPermission('change_projectserver')}
-                                                            value={server.purchase_date || ''} onChange={e => setNested('project_servers', idx, 'purchase_date', e.target.value)}
-                                                            className={inputCls} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Expiration Date</label>
-                                                        <input type="date"
-                                                            disabled={!hasPermission('change_projectserver')}
-                                                            value={server.expiration_date || ''} onChange={e => setNested('project_servers', idx, 'expiration_date', e.target.value)}
-                                                            className={inputCls} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Cost (₹)</label>
-                                                        <input type="number" step="0.01" placeholder="0.00"
-                                                            disabled={!hasPermission('change_projectserver')}
-                                                            value={server.cost || ''} onChange={e => setNested('project_servers', idx, 'cost', e.target.value)}
-                                                            className={`${inputCls} font-bold`} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Status</label>
-                                                        <select disabled={!hasPermission('change_projectserver')} value={server.status || 'Active'} onChange={e => setNested('project_servers', idx, 'status', e.target.value)} className={inputCls}>
-                                                            <option value="Active">Active</option>
-                                                            <option value="Inactive">Inactive</option>
-                                                            <option value="Pending">Pending</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={`${labelCls} text-emerald-500`}>Payment Status</label>
-                                                        <div className="flex items-center gap-2">
-                                                            <select disabled={!hasPermission('change_projectserver')} value={server.payment_status || 'UNPAID'} onChange={e => setNested('project_servers', idx, 'payment_status', e.target.value)} className={`${inputCls} flex-1 font-bold text-emerald-500`}>
-                                                                <option value="UNPAID">UNPAID</option>
-                                                                <option value="PARTIAL">PARTIAL</option>
-                                                                <option value="PAID">PAID</option>
-                                                            </select>
-                                                            <button
-                                                                type="button"
-                                                                disabled={!hasPermission('change_projectserver')}
-                                                                onClick={() => handleBillItem('server', server.name || 'Server', server.cost || 0, server.purchase_date, server.expiration_date, server.id)}
-                                                                className={`h-[46px] px-3 bg-emerald-500/10 text-emerald-500 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 ${hasPermission('change_projectserver') ? 'hover:bg-emerald-500/20' : 'opacity-60 cursor-not-allowed'}`}
-                                                                title="Generate Invoice"
-                                                            >
-                                                                <Receipt size={18} />
-                                                                <span className="text-[10px] font-black uppercase">Bill</span>
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    {server.accrued_by === 'Third Party' && (
-                                                        <div className="lg:col-span-3 pt-4 border-t border-border/30">
-                                                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                                                🏢 Provider Details
-                                                            </p>
-                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                                <div className="space-y-1">
-                                                                    <label className={labelCls}>Company Name</label>
-                                                                    <input type="text" placeholder="e.g. DigitalOcean"
-                                                                        disabled={!hasPermission('change_projectserver')}
-                                                                        value={server.provider_detail?.company_name || ''}
-                                                                        onChange={e => setNested('project_servers', idx, 'provider_detail', { ...(server.provider_detail || {}), company_name: e.target.value })}
-                                                                        className={inputCls} />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className={labelCls}>Contact Person</label>
-                                                                    <input type="text" placeholder="Manager Name"
-                                                                        disabled={!hasPermission('change_projectserver')}
-                                                                        value={server.provider_detail?.contact_person || ''}
-                                                                        onChange={e => setNested('project_servers', idx, 'provider_detail', { ...(server.provider_detail || {}), contact_person: e.target.value })}
-                                                                        className={inputCls} />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className={labelCls}>Email</label>
-                                                                    <input type="email" placeholder="support@do.com"
-                                                                        disabled={!hasPermission('change_projectserver')}
-                                                                        value={server.provider_detail?.email || ''}
-                                                                        onChange={e => setNested('project_servers', idx, 'provider_detail', { ...(server.provider_detail || {}), email: e.target.value })}
-                                                                        className={inputCls} />
-                                                                </div>
-                                                                <div className="space-y-1">
-                                                                    <label className={labelCls}>Phone</label>
-                                                                    <input type="text" placeholder="+1..."
-                                                                        disabled={!hasPermission('change_projectserver')}
-                                                                        value={server.provider_detail?.phone || ''}
-                                                                        onChange={e => setNested('project_servers', idx, 'provider_detail', { ...(server.provider_detail || {}), phone: e.target.value })}
-                                                                        className={inputCls} />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </FormSection>
-                                )}
-
-
-
-                                {/* ── 7. Project Team ── */}
-                                {hasPermission('view_projectteam') && (
-                                    <FormSection
-                                        title="Project Team"
-                                        icon={<Users size={22} />}
-                                        iconColor="text-violet-500"
-                                        bgColor="bg-violet-500/10"
-                                        action={
-                                            hasPermission('add_projectteam') ? (
-                                                <button type="button"
-                                                    onClick={() => addItem('project_teams', { team: '', status: 'Pending', payment_status: 'UNPAID', deadline: '', actual_end_date: '', description: '', members: [] })}
-                                                    className="text-xs flex items-center gap-1.5 px-4 py-2 bg-violet-500/10 text-violet-500 rounded-xl hover:bg-violet-500/20 transition-all font-bold">
-                                                    <Plus size={14} /> Add Team Group
-                                                </button>
-                                            ) : null
-                                        }>
-                                        <div className="space-y-6">
-                                            {formData.project_teams?.length === 0 && (
-                                                <div className="text-center py-12 bg-muted/5 rounded-[2.5rem] border border-dashed border-border">
-                                                    <div className="w-16 h-16 bg-muted/10 rounded-3xl flex items-center justify-center mx-auto mb-4 text-muted">
-                                                        <Users size={32} />
-                                                    </div>
-                                                    <h4 className="text-lg font-black text-foreground italic uppercase">No Team Groups</h4>
-                                                    <p className="text-muted text-xs font-medium mt-1">
-                                                        {hasPermission('add_projectteam') ? 'Click the button above to assign a team to this project' : 'You do not have permission to add teams'}
-                                                    </p>
-                                                </div>
-                                            )}
-                                            {formData.project_teams?.map((team: any, tIdx: number) => (
-                                                <div key={tIdx} className="border border-border rounded-[2rem] overflow-hidden bg-muted/5">
-                                                    <div className="p-5 flex flex-wrap items-center gap-4 border-b border-border/50">
-                                                        <div className="space-y-1">
-                                                            <label className={labelCls}>Select Team</label>
-                                                            <div className="flex items-center gap-2">
-                                                                <select
-                                                                    value={team.team}
-                                                                    disabled={!hasPermission('change_projectteam')}
-                                                                    onChange={e => {
-                                                                        const val = parseInt(e.target.value);
-                                                                        const selectedTeam = teams.find(t => t.id === val);
-                                                                        setFormData((p: any) => {
-                                                                            const pTeams = [...p.project_teams];
-                                                                            const pt = { ...pTeams[tIdx], team: val };
-
-                                                                            if (selectedTeam && selectedTeam.members) {
-                                                                                const currentMembers = pt.members || [];
-                                                                                const existingEmployeeIds = new Set(currentMembers.map((m: any) => m.employee));
-
-                                                                                const membersToAdd = selectedTeam.members
-                                                                                    .map((id: number, idx: number) => {
-                                                                                        if (existingEmployeeIds.has(id)) return null;
-                                                                                        const found = (users || []).find(u => u.id === id);
-                                                                                        if (found) return found;
-
-                                                                                        // Fallback to name from selectedTeam.member_names if ID lookup fails
-                                                                                        const name = (selectedTeam.member_names && selectedTeam.member_names[idx]) || `User ${id}`;
-                                                                                        return { id, username: name, first_name: name, last_name: '', designation: '' };
-                                                                                    })
-                                                                                    .filter(Boolean);
-
-                                                                                const newMembers = membersToAdd.map((user: any) => ({
-                                                                                    role: user.designation || '',
-                                                                                    cost: '0.00',
-                                                                                    allocated_days: 0,
-                                                                                    actual_days_spent: 0,
-                                                                                    employee: user.id,
-                                                                                    employee_name: user.first_name || user.username || `ID: ${user.id}`,
-                                                                                    start_date: '',
-                                                                                    end_date: '',
-                                                                                    status: 'Pending',
-                                                                                    notes: `Added from ${selectedTeam.name}`
-                                                                                }));
-                                                                                pt.members = [...currentMembers, ...newMembers];
-                                                                            }
-
-                                                                            pTeams[tIdx] = pt;
-                                                                            return { ...p, project_teams: pTeams };
-                                                                        });
-                                                                    }}
-                                                                    className={`${smallInputCls} w-48`}
-                                                                >
-                                                                    <option value="">Choose a team...</option>
-                                                                    {teams.map(t => (
-                                                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                                                    ))}
-                                                                </select>
-                                                                {hasPermission('add_projectteam') && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => {
-                                                                            setTeamAssignmentTarget({ type: 'project', idx: tIdx });
-                                                                            setIsQuickTeamModalOpen(true);
-                                                                        }}
-                                                                        className="p-2 bg-violet-500/10 text-violet-500 rounded-xl hover:bg-violet-500/20 transition-all border border-violet-500/20"
-                                                                        title="Create New Team"
-                                                                    >
-                                                                        <Plus size={16} />
-                                                                    </button>
-                                                                )}
-                                                                {hasPermission('change_projectteam') && (
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => syncProjectTeamMembers(tIdx)}
-                                                                        className="p-2 bg-violet-500/10 text-violet-500 rounded-xl hover:bg-violet-500/20 transition-all border border-violet-500/20"
-                                                                        title="Sync/Reload Team Members"
-                                                                    >
-                                                                        <RefreshCcw size={16} />
-                                                                    </button>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className={labelCls}>Status</label>
-                                                            <select value={team.status || 'Pending'}
-                                                                disabled={!hasPermission('change_projectteam')}
-                                                                onChange={e => setNested('project_teams', tIdx, 'status', e.target.value)}
-                                                                className={`${smallInputCls} w-32`}>
-                                                                <option value="Pending">Pending</option>
-                                                                <option value="Progressing">Progressing</option>
-                                                                <option value="Completed">Completed</option>
-                                                            </select>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className={`${labelCls} text-emerald-500`}>Payment Status</label>
-                                                            <div className="flex items-center gap-2">
-                                                                <select value={team.payment_status || 'UNPAID'}
-                                                                    disabled={!hasPermission('change_projectteam')}
-                                                                    onChange={e => setNested('project_teams', tIdx, 'payment_status', e.target.value)}
-                                                                    className={`${smallInputCls} flex-1 h-[46px] font-bold text-emerald-500`}>
-                                                                    <option value="UNPAID">UNPAID</option>
-                                                                    <option value="PAID">PAID</option>
-                                                                </select>
-                                                                <button
-                                                                    type="button"
-                                                                    disabled={!hasPermission('change_projectteam')}
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        if (!team.id) {
-                                                                            alert('Please save the project first to generate a bill for this team.');
-                                                                            return;
-                                                                        }
-                                                                        handleBillItem('team', team.team_detail?.name || 'Project Team', team.cost || 0, '', '', team.id);
-                                                                    }}
-                                                                    className={`h-[46px] px-3 bg-emerald-500/10 text-emerald-500 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 ${hasPermission('change_projectteam') ? 'hover:bg-emerald-500/20' : 'opacity-60 cursor-not-allowed'}`}
-                                                                    title="Generate Invoice"
-                                                                >
-                                                                    <DollarSign size={18} />
-                                                                    <span className="text-[10px] font-black uppercase">Bill</span>
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className={`${labelCls} text-emerald-500`}>Cost (₹)</label>
-                                                            <input type="number" step="0.01" placeholder="0.00" value={team.cost || ''}
-                                                                disabled={!hasPermission('change_projectteam')}
-                                                                onChange={e => setNested('project_teams', tIdx, 'cost', e.target.value)}
-                                                                className={`${smallInputCls} w-32 font-bold text-emerald-500`} />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className={labelCls}>Team Allocation Start</label>
-                                                            <input type="date" value={team.start_date || ''}
-                                                                disabled={!hasPermission('change_projectteam')}
-                                                                onChange={e => setNested('project_teams', tIdx, 'start_date', e.target.value)}
-                                                                className={`${smallInputCls} w-40`} />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className={labelCls}>Team Allocation End</label>
-                                                            <input type="date" value={team.end_date || ''}
-                                                                disabled={!hasPermission('change_projectteam')}
-                                                                onChange={e => setNested('project_teams', tIdx, 'end_date', e.target.value)}
-                                                                className={`${smallInputCls} w-40`} />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className={`${labelCls} text-rose-500`}>Deadline</label>
-                                                            <input type="date" value={team.deadline || ''}
-                                                                disabled={!hasPermission('change_projectteam')}
-                                                                onChange={e => setNested('project_teams', tIdx, 'deadline', e.target.value)}
-                                                                className={`${smallInputCls} w-40 text-rose-500 font-bold`} />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className={`${labelCls} text-emerald-500`}>Actual End Date</label>
-                                                            <input type="date" value={team.actual_end_date || ''}
-                                                                disabled={!hasPermission('change_projectteam')}
-                                                                onChange={e => setNested('project_teams', tIdx, 'actual_end_date', e.target.value)}
-                                                                className={`${smallInputCls} w-40 text-emerald-500`} />
-                                                        </div>
-                                                        {hasPermission('delete_projectteam') && (
-                                                            <button type="button" onClick={() => removeItem('project_teams', tIdx)} className="text-rose-500 hover:bg-rose-500/10 p-2.5 rounded-2xl ml-auto">
-                                                                <Trash2 size={18} />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="px-6 pb-5">
-                                                        <div className="space-y-1">
-                                                            <label className={labelCls}>Team Description / Requirements</label>
-                                                            <textarea
-                                                                placeholder="Specify team-specific requirements or notes..."
-                                                                value={team.description || ''}
-                                                                disabled={!hasPermission('change_projectteam')}
-                                                                onChange={e => setNested('project_teams', tIdx, 'description', e.target.value)}
-                                                                className={`${inputCls} min-h-[80px] py-3 text-sm`}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="p-5 space-y-3">
-                                                        <div className="flex items-center justify-between">
-                                                            <p className={labelCls}>Members</p>
-                                                            {hasPermission('add_projectteam') && (
-                                                                <button type="button" onClick={() => addTeamMember(tIdx)}
-                                                                    className="text-[11px] font-bold text-primary uppercase flex items-center gap-1 hover:bg-primary/10 px-3 py-1.5 rounded-xl transition-all">
-                                                                    <Plus size={13} /> Add Member
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                        {team.members?.map((m: any, mIdx: number) => (
-                                                            <div key={mIdx} className="bg-card p-5 rounded-2xl border border-border space-y-4">
-                                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                                    <div className="space-y-1">
-                                                                        <label className={labelCls}>Role</label>
-                                                                        <select
-                                                                            value={m.role}
-                                                                            disabled={!hasPermission('change_projectteam')}
-                                                                            onChange={e => setTeamMember(tIdx, mIdx, 'role', e.target.value)}
-                                                                            className={inputCls}
-                                                                        >
-                                                                            <option value="">Select Role...</option>
-                                                                            {COMMON_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                                                                            {!COMMON_ROLES.includes(m.role) && m.role && <option value={m.role}>{m.role}</option>}
-                                                                        </select>
-                                                                    </div>
-                                                                    <div className="space-y-1">
-                                                                        <label className={labelCls}>Cost (₹)</label>
-                                                                        <input type="number" step="0.01" placeholder="0.00" value={m.cost}
-                                                                            disabled={!hasPermission('change_projectteam')}
-                                                                            onChange={e => setTeamMember(tIdx, mIdx, 'cost', e.target.value)}
-                                                                            className={`${inputCls} text-emerald-500 font-bold`} />
-                                                                    </div>
-                                                                    <div className="space-y-1">
-                                                                        <label className={labelCls}>Employee</label>
-                                                                        <select
-                                                                            value={m.employee || ''}
-                                                                            disabled={!hasPermission('change_projectteam')}
-                                                                            onChange={e => setTeamMember(tIdx, mIdx, 'employee', parseInt(e.target.value))}
-                                                                            className={inputCls}
-                                                                        >
-                                                                            <option value="">Select Employee...</option>
-                                                                            {users.map(u => (
-                                                                                <option key={u.id} value={u.id}>
-                                                                                    {(u.first_name || u.last_name) ? `${u.first_name} ${u.last_name}` : u.username}
-                                                                                </option>
-                                                                            ))}
-                                                                            {/* Robust Fallback: Show only the name if not found in the global list */}
-                                                                            {m.employee && !users.some(u => u.id === m.employee) && (
-                                                                                <option value={m.employee}>
-                                                                                    {m.employee_name || `ID: ${m.employee}`}
-                                                                                </option>
-                                                                            )}
-                                                                        </select>
-                                                                    </div>
-                                                                    <div className="space-y-1">
-                                                                        <label className={labelCls}>Allocated Days</label>
-                                                                        <input type="number" placeholder="0" value={m.allocated_days || 0}
-                                                                            disabled={!hasPermission('change_projectteam')}
-                                                                            onChange={e => setTeamMember(tIdx, mIdx, 'allocated_days', parseInt(e.target.value))}
-                                                                            className={inputCls} />
-                                                                    </div>
-                                                                    <div className="space-y-1">
-                                                                        <label className={labelCls}>Actual Days Spent</label>
-                                                                        <input type="number" placeholder="0" value={m.actual_days_spent || 0}
-                                                                            disabled={!hasPermission('change_projectteam')}
-                                                                            onChange={e => setTeamMember(tIdx, mIdx, 'actual_days_spent', parseInt(e.target.value))}
-                                                                            className={inputCls} />
-                                                                    </div>
-                                                                    <div className="space-y-1">
-                                                                        <label className={labelCls}>Status</label>
-                                                                        <select value={m.status || 'Pending'}
-                                                                            disabled={!hasPermission('change_projectteam')}
-                                                                            onChange={e => setTeamMember(tIdx, mIdx, 'status', e.target.value)}
-                                                                            className={inputCls}>
-                                                                            <option value="Pending">Pending</option>
-                                                                            <option value="Progressing">Progressing</option>
-                                                                            <option value="Completed">Completed</option>
-                                                                        </select>
-                                                                    </div>
-                                                                    <div className="space-y-1">
-                                                                        <label className={labelCls}>Start Date</label>
-                                                                        <input type="date" value={m.start_date || ''}
-                                                                            disabled={!hasPermission('change_projectteam')}
-                                                                            onChange={e => setTeamMember(tIdx, mIdx, 'start_date', e.target.value)}
-                                                                            className={inputCls} />
-                                                                    </div>
-                                                                    <div className="space-y-1">
-                                                                        <label className={labelCls}>End Date</label>
-                                                                        <input type="date" value={m.end_date || ''}
-                                                                            disabled={!hasPermission('change_projectteam')}
-                                                                            onChange={e => setTeamMember(tIdx, mIdx, 'end_date', e.target.value)}
-                                                                            className={inputCls} />
-                                                                    </div>
-                                                                    <div className="space-y-1 sm:col-span-2 lg:col-span-1">
-                                                                        <label className={labelCls}>Notes</label>
-                                                                        <input type="text" placeholder="e.g. Handling UI components" value={m.notes || ''}
-                                                                            disabled={!hasPermission('change_projectteam')}
-                                                                            onChange={e => setTeamMember(tIdx, mIdx, 'notes', e.target.value)}
-                                                                            className={inputCls} />
-                                                                    </div>
-                                                                </div>
-                                                                {hasPermission('delete_projectteam') && (
-                                                                    <div className="flex justify-end">
-                                                                        <button type="button" onClick={() => removeTeamMember(tIdx, mIdx)}
-                                                                            className="text-rose-500 hover:bg-rose-500/10 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all">
-                                                                            <Trash2 size={14} /> Remove Member
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </FormSection>
-                                )}
-
-                                {/* ── 7. Associated Services ── */}
-                                {hasPermission('view_projectservice') && (
-                                <FormSection
-                                    title="Associated Services"
-                                    icon={<Layers size={22} />}
-                                    iconColor="text-purple-500"
-                                    bgColor="bg-purple-500/10"
-                                    defaultOpen={true}
-                                    action={
-                                        hasPermission('add_projectservice') ? (
-                                        <button type="button"
-                                            onClick={() => addItem('services', newServiceTemplate())}
-                                            className="text-xs flex items-center gap-1.5 px-4 py-2 bg-purple-500/10 text-purple-500 rounded-xl hover:bg-purple-500/20 transition-all font-bold">
-                                            <Plus size={14} /> Service
-                                        </button>
-                                        ) : null
-                                    }>
-                                    <div className="space-y-6">
-                                        {formData.services.length === 0 && (
-                                            <p className="text-center text-muted text-sm py-6">No associated services yet. Click "+ Service" to add one.</p>
-                                        )}
-                                        {formData.services.map((service: any, sIdx: number) => (
-                                            <ServiceFormCard
-                                                key={sIdx}
-                                                service={service}
-                                                sIdx={sIdx}
-                                                addServiceTeamMember={addServiceTeamMember}
-                                                removeServiceTeamMember={removeServiceTeamMember}
-                                                setServiceTeamMember={setServiceTeamMember}
-                                                setServiceField={setServiceField}
-                                                removeItem={removeItem}
-                                                teams={teams}
-                                                users={users}
-                                                roles={COMMON_ROLES}
-                                                setFormData={setFormData}
-                                                onBill={handleBillItem}
-                                                setIsQuickTeamModalOpen={setIsQuickTeamModalOpen}
-                                                setTeamAssignmentTarget={setTeamAssignmentTarget}
-                                                syncTeamMembers={syncServiceTeamMembers}
-                                            />
-                                        ))}
-                                    </div>
-                                </FormSection>
-                                )}
-
-                                {/* ── Submit ── */}
-                                <div className="flex flex-col sm:flex-row items-center justify-end gap-6 py-6 border-t border-border sticky bottom-0 bg-background/80 backdrop-blur-sm px-6">
-                                    <div className="flex items-center gap-4">
-                                        <button type="button" onClick={() => navigate(-1)}
-                                            className="px-8 py-3.5 bg-muted/10 text-muted font-bold rounded-2xl border border-transparent hover:border-border hover:bg-muted/20 transition-all">
-                                            Cancel
-                                        </button>
-                                        <button type="submit" disabled={saving}
-                                            className="px-10 py-3.5 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 flex items-center gap-3 disabled:opacity-50 hover:shadow-primary/50 transition-all active:scale-95">
-                                            {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                                            {isEdit ? 'Update Project' : 'Create Project'}
-                                        </button>
-                                    </div>
-                                </div>
-                            </form>
-
-                            <QuickTeamModal
-                                isOpen={isQuickTeamModalOpen}
-                                onClose={() => {
-                                    setIsQuickTeamModalOpen(false);
-                                    setTeamAssignmentTarget(null);
-                                }}
-                                onSuccess={(newTeam) => {
-                                    setTeams(prev => [...prev, newTeam as any]);
-
-                                    if (teamAssignmentTarget) {
-                                        const { type, idx } = teamAssignmentTarget;
-                                        const val = newTeam.id;
-                                        const selectedTeam = newTeam; // members_details should be present in the response if serializer permits, but if not we might need a refetch.
-                                        // Actually let's assume it has members_details for now.
-
-                                        setFormData((p: any) => {
-                                            if (type === 'service') {
-                                                const services = [...p.services];
-                                                const s = { ...services[idx] };
-                                                const pt = [...(s.teams || [])];
-
-                                                if (pt.length === 0) {
-                                                    s.teams = [{ team: val, allocated_days: 0, actual_days: 0 }];
-                                                } else {
-                                                    pt[0] = { ...pt[0], team: val };
-                                                    s.teams = pt;
-                                                }
-
-                                                if (selectedTeam.members) {
-                                                    const currentMembers = s.members || [];
-                                                    const existingEmployeeIds = new Set(currentMembers.map((m: any) => m.employee));
-
-                                                    const membersToAdd = selectedTeam.members
-                                                        .filter((id: number) => !existingEmployeeIds.has(id))
-                                                        .map((id: number) => users.find(u => u.id === id))
-                                                        .filter(Boolean);
-
-                                                    const newMembers = membersToAdd.map((user: any) => ({
-                                                        role: user.designation || '',
-                                                        cost: '0.00',
-                                                        allocated_days: 0,
-                                                        actual_days: 0,
-                                                        employee: user.id,
-                                                        start_date: s.start_date || '',
-                                                        end_date: s.deadline || '',
-                                                        status: 'Pending',
-                                                        notes: `Added from ${selectedTeam.name}`
-                                                    }));
-                                                    s.members = [...currentMembers, ...newMembers];
-                                                }
-
-                                                services[idx] = s;
-                                                return { ...p, services: services };
-                                            } else {
-                                                const pTeams = [...p.project_teams];
-                                                const pt = { ...pTeams[idx], team: val };
-
-                                                if (selectedTeam.members) {
-                                                    const currentMembers = pt.members || [];
-                                                    const existingEmployeeIds = new Set(currentMembers.map((m: any) => m.employee));
-
-                                                    const membersToAdd = selectedTeam.members
-                                                        .filter((id: number) => !existingEmployeeIds.has(id))
-                                                        .map((id: number) => users.find(u => u.id === id))
-                                                        .filter(Boolean);
-
-                                                    const newMembers = membersToAdd.map((user: any) => ({
-                                                        role: user.designation || '',
-                                                        cost: '0.00',
-                                                        allocated_days: 0,
-                                                        actual_days_spent: 0,
-                                                        employee: user.id,
-                                                        start_date: '',
-                                                        end_date: '',
-                                                        status: 'Pending',
-                                                        notes: `Added from ${selectedTeam.name}`
-                                                    }));
-                                                    pt.members = [...currentMembers, ...newMembers];
-                                                }
-
-                                                pTeams[idx] = pt;
-                                                return { ...p, project_teams: pTeams };
-                                            }
-                                        });
-                                    }
-
-                                    setIsQuickTeamModalOpen(false);
-                                    setTeamAssignmentTarget(null);
-                                }}
-                            />
+                            {formData.services.map((service: any, sIdx: number) => (
+                                <ServiceFormCard
+                                    key={sIdx}
+                                    service={service}
+                                    sIdx={sIdx}
+                                    addServiceTeamMember={addServiceTeamMember}
+                                    removeServiceTeamMember={removeServiceTeamMember}
+                                    setServiceTeamMember={setServiceTeamMember}
+                                    setServiceField={setServiceField}
+                                    removeItem={removeItem}
+                                    teams={teams}
+                                    users={users}
+                                    roles={COMMON_ROLES}
+                                    setFormData={setFormData}
+                                    onBill={handleBillItem}
+                                    setIsQuickTeamModalOpen={setIsQuickTeamModalOpen}
+                                    setTeamAssignmentTarget={setTeamAssignmentTarget}
+                                    syncTeamMembers={syncServiceTeamMembers}
+                                />
+                            ))}
                         </div>
-                        );
+                    </FormSection>
+                )}
+
+                {/* ── Submit ── */}
+                <div className="flex flex-col sm:flex-row items-center justify-end gap-6 py-6 border-t border-border sticky bottom-0 bg-background/80 backdrop-blur-sm px-6">
+                    <div className="flex items-center gap-4">
+                        <button type="button" onClick={() => navigate(-1)}
+                            className="px-8 py-3.5 bg-muted/10 text-muted font-bold rounded-2xl border border-transparent hover:border-border hover:bg-muted/20 transition-all">
+                            Cancel
+                        </button>
+                        <button type="submit" disabled={saving}
+                            className="px-10 py-3.5 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 flex items-center gap-3 disabled:opacity-50 hover:shadow-primary/50 transition-all active:scale-95">
+                            {saving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                            {isEdit ? 'Update Project' : 'Create Project'}
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <BillingPreviewModal
+                isOpen={isBillingModalOpen}
+                onClose={() => setIsBillingModalOpen(false)}
+                onConfirm={handleBillingConfirm}
+                onSkip={handleBillingSkip}
+                items={billingPreviewItems}
+                onUpdateItem={handleUpdateBillingItem}
+                onAddItem={handleAddBillingItem}
+            />
+            <QuickTeamModal
+                isOpen={isQuickTeamModalOpen}
+                onClose={() => {
+                    setIsQuickTeamModalOpen(false);
+                    setTeamAssignmentTarget(null);
+                }}
+                onSuccess={(newTeam) => {
+                    setTeams(prev => [...prev, newTeam as any]);
+
+                    if (teamAssignmentTarget) {
+                        const { type, idx } = teamAssignmentTarget;
+                        const val = newTeam.id;
+                        const selectedTeam = newTeam; // members_details should be present in the response if serializer permits, but if not we might need a refetch.
+                        // Actually let's assume it has members_details for now.
+
+                        setFormData((p: any) => {
+                            if (type === 'service') {
+                                const services = [...p.services];
+                                const s = { ...services[idx] };
+                                const pt = [...(s.teams || [])];
+
+                                if (pt.length === 0) {
+                                    s.teams = [{ team: val, allocated_days: 0, actual_days: 0 }];
+                                } else {
+                                    pt[0] = { ...pt[0], team: val };
+                                    s.teams = pt;
+                                }
+
+                                if (selectedTeam.members) {
+                                    const currentMembers = s.members || [];
+                                    const existingEmployeeIds = new Set(currentMembers.map((m: any) => m.employee));
+
+                                    const membersToAdd = selectedTeam.members
+                                        .filter((id: number) => !existingEmployeeIds.has(id))
+                                        .map((id: number) => users.find(u => u.id === id))
+                                        .filter(Boolean);
+
+                                    const newMembers = membersToAdd.map((user: any) => ({
+                                        role: user.designation || '',
+                                        cost: '0.00',
+                                        allocated_days: 0,
+                                        actual_days: 0,
+                                        employee: user.id,
+                                        start_date: s.start_date || '',
+                                        end_date: s.deadline || '',
+                                        status: 'Pending',
+                                        notes: `Added from ${selectedTeam.name}`
+                                    }));
+                                    s.members = [...currentMembers, ...newMembers];
+                                }
+
+                                services[idx] = s;
+                                return { ...p, services: services };
+                            } else {
+                                const pTeams = [...p.project_teams];
+                                const pt = { ...pTeams[idx], team: val };
+
+                                if (selectedTeam.members) {
+                                    const currentMembers = pt.members || [];
+                                    const existingEmployeeIds = new Set(currentMembers.map((m: any) => m.employee));
+
+                                    const membersToAdd = selectedTeam.members
+                                        .filter((id: number) => !existingEmployeeIds.has(id))
+                                        .map((id: number) => users.find(u => u.id === id))
+                                        .filter(Boolean);
+
+                                    const newMembers = membersToAdd.map((user: any) => ({
+                                        role: user.designation || '',
+                                        cost: '0.00',
+                                        allocated_days: 0,
+                                        actual_days_spent: 0,
+                                        employee: user.id,
+                                        start_date: '',
+                                        end_date: '',
+                                        status: 'Pending',
+                                        notes: `Added from ${selectedTeam.name}`
+                                    }));
+                                    pt.members = [...currentMembers, ...newMembers];
+                                }
+
+                                pTeams[idx] = pt;
+                                return { ...p, project_teams: pTeams };
+                            }
+                        });
+                    }
+
+                    setIsQuickTeamModalOpen(false);
+                    setTeamAssignmentTarget(null);
+                }}
+            />
+        </div>
+    );
 };
 
-                        export default ProjectForm;
+export default ProjectForm;

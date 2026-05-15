@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { getActivity, createActivity, updateActivity } from './activityService';
-import { getProjects, getProject, getTeams } from '../projects/projectService';
-import { getUsers } from '../user/userService';
+import { getProject } from '../projects/projectService';
+import SearchableUserSelect from '../../components/SearchableUserSelect';
+import SearchableProjectSelect from '../../components/SearchableProjectSelect';
+import SearchableTeamSelect from '../../components/SearchableTeamSelect';
 import {
     ArrowLeft,
     Save,
@@ -33,10 +35,7 @@ const ActivityForm: React.FC = () => {
     const [loading, setLoading] = useState(isEdit);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    const [projects, setProjects] = useState<any[]>([]);
-    const [teams, setTeams] = useState<any[]>([]);
-    const [users, setUsers] = useState<any[]>([]);
+    const [selectedProjectServices, setSelectedProjectServices] = useState<any[]>([]);
 
     const [formData, setFormData] = useState<any>({
         description: '',
@@ -55,28 +54,6 @@ const ActivityForm: React.FC = () => {
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                const [pData, tData, uData] = await Promise.all([
-                    getProjects(1, ''),
-                    getTeams(),
-                    getUsers(1, '')
-                ]);
-                let projectsList = pData.results || [];
-
-                // If a project is pre-filled, fetch its full detail to get services
-                if (prefilledProjectId && !isEdit) {
-                    try {
-                        const fullProject = await getProject(parseInt(prefilledProjectId));
-                        // Replace or append the full project in our list
-                        const idx = projectsList.findIndex(p => p.id.toString() === prefilledProjectId);
-                        if (idx >= 0) projectsList[idx] = fullProject;
-                        else projectsList = [fullProject, ...projectsList];
-                    } catch { /* ignore */ }
-                }
-
-                setProjects(projectsList);
-                setTeams(tData || []);
-                setUsers(uData.results || []);
-
                 if (isEdit && id) {
                     const activity = await getActivity(parseInt(id));
                     setFormData({
@@ -87,6 +64,14 @@ const ActivityForm: React.FC = () => {
                         project_service: activity.project_service?.toString() || '',
                         target_work_percentage: activity.target_work_percentage || 0
                     });
+
+                    if (activity.project) {
+                        const fullProject = await getProject(activity.project);
+                        setSelectedProjectServices(fullProject.services || []);
+                    }
+                } else if (prefilledProjectId) {
+                    const fullProject = await getProject(parseInt(prefilledProjectId));
+                    setSelectedProjectServices(fullProject.services || []);
                 }
             } catch (err: any) {
                 setError('Failed to load initial data.');
@@ -95,7 +80,7 @@ const ActivityForm: React.FC = () => {
             }
         };
         loadInitialData();
-    }, [id, isEdit]);
+    }, [id, isEdit, prefilledProjectId]);
 
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -135,8 +120,6 @@ const ActivityForm: React.FC = () => {
         </div>
     );
 
-    const selectedProject = projects.find(p => p.id.toString() === formData.project.toString());
-    const availableServices = selectedProject?.services || [];
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
@@ -174,42 +157,43 @@ const ActivityForm: React.FC = () => {
                             </div>
                             <div>
                                 <label className={labelCls}>Employee</label>
-                                <select value={formData.employee} onChange={e => setFormData({ ...formData, employee: e.target.value })} className={inputCls} required>
-                                    <option value="">Select Employee...</option>
-                                    {users.map(u => (
-                                        <option key={u.id} value={u.id}>{u.username}</option>
-                                    ))}
-                                </select>
+                                <SearchableUserSelect
+                                    value={formData.employee}
+                                    onChange={(val) => setFormData({ ...formData, employee: val?.toString() || '' })}
+                                />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-4">
                                 <div>
                                     <label className={labelCls}>Project</label>
-                                    <select value={formData.project} onChange={e => setFormData({ ...formData, project: e.target.value, project_service: '' })} className={inputCls}>
-                                        <option value="">No Project</option>
-                                        {projects.map(p => {
-                                            const name = p.name || p.project_base_informations?.[0]?.name || p.description || `Project #${p.id}`;
-                                            return (
-                                                <option key={p.id} value={p.id}>{name}</option>
-                                            );
-                                        })}
-                                    </select>
+                                    <SearchableProjectSelect
+                                        value={formData.project}
+                                        onChange={async (val) => {
+                                            setFormData({ ...formData, project: val?.toString() || '', project_service: '' });
+                                            if (val) {
+                                                const p = await getProject(val);
+                                                setSelectedProjectServices(p.services || []);
+                                            } else {
+                                                setSelectedProjectServices([]);
+                                            }
+                                        }}
+                                        placeholder="No Project"
+                                    />
                                 </div>
                                 <div>
                                     <label className={labelCls}>Team</label>
-                                    <select value={formData.team} onChange={e => setFormData({ ...formData, team: e.target.value })} className={inputCls}>
-                                        <option value="">No Team</option>
-                                        {teams.map(t => (
-                                            <option key={t.id} value={t.id}>{t.name}</option>
-                                        ))}
-                                    </select>
+                                    <SearchableTeamSelect
+                                        value={formData.team}
+                                        onChange={(val) => setFormData({ ...formData, team: val?.toString() || '' })}
+                                        placeholder="No Team"
+                                    />
                                 </div>
                             </div>
-                            {availableServices.length > 0 && (
+                            {selectedProjectServices.length > 0 && (
                                 <div>
                                     <label className={labelCls}>Related Service</label>
                                     <select value={formData.project_service} onChange={e => setFormData({ ...formData, project_service: e.target.value })} className={inputCls}>
                                         <option value="">Select Service...</option>
-                                        {availableServices.map((s: any) => (
+                                        {selectedProjectServices.map((s: any) => (
                                             <option key={s.id} value={s.id}>{s.name}</option>
                                         ))}
                                     </select>

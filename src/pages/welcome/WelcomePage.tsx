@@ -32,8 +32,7 @@ const WelcomePage: React.FC = () => {
             navigate('/dashboard');
         } else if (hasPermission('view_user')) {
             navigate('/users');
-        } else if (hasPermission('view_employee')) {
-            navigate('/employees');
+
         } else if (hasPermission('view_team')) {
             navigate('/teams');
         } else {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Users,
     Briefcase,
@@ -13,10 +14,12 @@ import {
     Layers3,
     AlertTriangle,
     Calendar,
-    ArrowRight
+    ArrowRight,
+    Plus
 } from 'lucide-react';
 import { motion, type Variants } from 'framer-motion';
 import { getTeamPerformance, type TeamPerformance as TeamPerformanceData, type TeamPerformanceResponse, type PerformanceItem } from './userService';
+import Pagination from '../../components/Pagination';
 
 const containerVariants: Variants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 const itemVariants: Variants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 100 } } };
@@ -226,8 +229,8 @@ const TeamCard: React.FC<{ data: TeamPerformanceData; rank: number }> = ({ data,
         <motion.div variants={itemVariants} className="bg-card border border-border rounded-3xl shadow-xl overflow-hidden">
             <button onClick={() => setExpanded(v => !v)} className="w-full p-6 flex items-center justify-between gap-4 hover:bg-muted/5 transition-colors text-left">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black italic text-xl">
-                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`}
+                    <div className="w-10 h-10 rounded-lg bg-muted/20 flex items-center justify-center text-[11px] font-black text-muted group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                        {rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : String(rank).padStart(2, '0')}
                     </div>
                     <div>
                         <h3 className="text-xl font-black italic text-foreground">{data.team_name}</h3>
@@ -253,25 +256,30 @@ const TeamCard: React.FC<{ data: TeamPerformanceData; rank: number }> = ({ data,
 
 // ── Main Component ──
 const TeamPerformance: React.FC = () => {
+    const navigate = useNavigate();
     const [rawData, setRawData] = useState<TeamPerformanceResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const PAGE_SIZE = 10;
+
+    const fetchData = async (page: number) => {
+        setLoading(true);
+        try {
+            const data = await getTeamPerformance(undefined, page, PAGE_SIZE);
+            setRawData(data);
+            setError(null);
+        } catch (err) {
+            console.error('Failed to fetch team performance:', err);
+            setError("Unable to sync team performance data. Please ensure you have the required permissions.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const data = await getTeamPerformance();
-                setRawData(data);
-                setError(null);
-            } catch (err) {
-                console.error('Failed to fetch team performance:', err);
-                setError("Unable to sync team performance data. Please ensure you have the required permissions.");
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
-    }, []);
+        fetchData(currentPage);
+    }, [currentPage]);
 
     if (loading) {
         return (
@@ -314,6 +322,23 @@ const TeamPerformance: React.FC = () => {
                         Tracking <span className="text-foreground font-black italic">{rawData.total_teams} teams</span> and their current assignment status.
                     </p>
                 </div>
+
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/teams')}
+                        className="flex items-center gap-2 px-6 py-3 bg-muted/10 text-foreground font-black rounded-2xl shadow-sm hover:bg-muted/20 transition-all hover:scale-[1.02] active:scale-95 text-sm italic border border-border/50"
+                    >
+                        <Layers3 size={18} strokeWidth={2.5} />
+                        <span>View All Teams</span>
+                    </button>
+                    <button
+                        onClick={() => navigate('/teams/new')}
+                        className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white font-black rounded-2xl shadow-xl shadow-blue-500/30 hover:shadow-blue-500/50 transition-all hover:scale-[1.02] active:scale-95 text-sm italic"
+                    >
+                        <Plus size={18} strokeWidth={2.5} />
+                        <span>Create Team</span>
+                    </button>
+                </div>
             </div>
 
             {/* Global Stats Summary */}
@@ -343,13 +368,20 @@ const TeamPerformance: React.FC = () => {
 
             {/* Individual team cards */}
             <div className="space-y-6">
-                <h3 className="text-xl font-black italic flex items-center gap-3">
-                    <ListTodo className="text-primary" size={24} />
-                    Active Teams
-                </h3>
+                <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-black italic flex items-center gap-3">
+                        <ListTodo className="text-primary" size={24} />
+                        Active Teams
+                    </h3>
+                    {rawData.total_pages > 1 && (
+                        <span className="text-muted text-xs font-bold">
+                            Page {rawData.current_page} of {rawData.total_pages}
+                        </span>
+                    )}
+                </div>
                 <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-6">
                     {(rawData.teams || []).map((team, i) => (
-                        <TeamCard key={team.team_id} data={team} rank={i + 1} />
+                        <TeamCard key={team.team_id} data={team} rank={(currentPage - 1) * PAGE_SIZE + i + 1} />
                     ))}
                 </motion.div>
 
@@ -360,6 +392,16 @@ const TeamPerformance: React.FC = () => {
                         <p className="text-muted text-sm font-medium">Your current view doesn't have any teams assigned.</p>
                     </div>
                 )}
+
+                {/* Pagination Controls */}
+                <Pagination 
+                    currentPage={currentPage}
+                    totalPages={rawData.total_pages}
+                    totalCount={rawData.total_teams}
+                    itemsPerPage={PAGE_SIZE}
+                    onPageChange={setCurrentPage}
+                    itemName="teams"
+                />
             </div>
         </div>
     );

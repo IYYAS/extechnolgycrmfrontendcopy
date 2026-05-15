@@ -39,6 +39,7 @@ import NotificationList from './pages/notifications/NotificationList';
 import LeaveList from './pages/leaves/LeaveList';
 import LeaveForm from './pages/leaves/LeaveForm';
 import SalaryList from './pages/salaries/SalaryList';
+import EmployeeSalarySummaryList from './pages/salaries/EmployeeSalarySummaryList';
 import SalaryForm from './pages/salaries/SalaryForm';
 import UserSalaryList from './pages/userSalaries/UserSalaryList';
 import UserSalaryForm from './pages/userSalaries/UserSalaryForm';
@@ -48,8 +49,7 @@ import OtherIncomeList from './pages/otherIncomes/OtherIncomeList';
 import OtherIncomeForm from './pages/otherIncomes/OtherIncomeForm';
 import OtherExpenseList from './pages/otherExpenses/OtherExpenseList';
 import OtherExpenseForm from './pages/otherExpenses/OtherExpenseForm';
-import EmployeeList from './pages/employees/EmployeeList';
-import EmployeeForm from './pages/employees/EmployeeForm';
+
 import ReportsPage from './pages/reports/ReportsPage';
 import ServerList from './pages/infrastructure/ServerList';
 import ServerForm from './pages/infrastructure/ServerForm';
@@ -58,6 +58,15 @@ import DomainList from './pages/infrastructure/DomainList';
 import DomainForm from './pages/infrastructure/DomainForm';
 import DomainDetail from './pages/infrastructure/DomainDetail';
 import WelcomePage from './pages/welcome/WelcomePage';
+import ExbotList from './pages/exbot/ExbotList';
+import ExbotForm from './pages/exbot/ExbotForm';
+import ExbotDetail from './pages/exbot/ExbotDetail';
+import LeadDashboard from './pages/leads/LeadDashboard';
+import LeadList from './pages/leads/LeadList';
+import LeadDetail from './pages/leads/LeadDetail';
+import LeadForm from './pages/leads/LeadForm';
+
+
 
 import PermissionGate from './components/PermissionGate';
 import { ThemeProvider } from './context/ThemeContext';
@@ -237,6 +246,11 @@ function App() {
                             } />
                             <Route path="/salaries" element={
                                 <PermissionGate permission="view_salary">
+                                    <EmployeeSalarySummaryList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/salaries/history" element={
+                                <PermissionGate permission="view_salary">
                                     <SalaryList />
                                 </PermissionGate>
                             } />
@@ -310,21 +324,7 @@ function App() {
                                     <OtherExpenseForm />
                                 </PermissionGate>
                             } />
-                            <Route path="/employees" element={
-                                <PermissionGate permission="view_employee">
-                                    <EmployeeList />
-                                </PermissionGate>
-                            } />
-                            <Route path="/employees/new" element={
-                                <PermissionGate permission="add_employee">
-                                    <EmployeeForm />
-                                </PermissionGate>
-                            } />
-                            <Route path="/employees/edit/:id" element={
-                                <PermissionGate permission="change_employee">
-                                    <EmployeeForm />
-                                </PermissionGate>
-                            } />
+
                             <Route path="/infrastructure/servers" element={
                                 <PermissionGate permission="view_projectserver">
                                     <ServerList />
@@ -363,6 +363,26 @@ function App() {
                             <Route path="/infrastructure/domains/:id" element={
                                 <PermissionGate permission="view_projectdomain">
                                     <DomainDetail />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/exbots" element={
+                                <PermissionGate permission="view_projectexbot">
+                                    <ExbotList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/exbots/new" element={
+                                <PermissionGate permission="add_projectexbot">
+                                    <ExbotForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/exbots/edit/:id" element={
+                                <PermissionGate permission="change_projectexbot">
+                                    <ExbotForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/infrastructure/exbots/:id" element={
+                                <PermissionGate permission="view_projectexbot">
+                                    <ExbotDetail />
                                 </PermissionGate>
                             } />
                             <Route path="/reports" element={
@@ -407,6 +427,35 @@ function App() {
                                     <RoleManagement />
                                 </PermissionGate>
                             } />
+
+                            {/* Lead Management */}
+                            <Route path="/leads/dashboard" element={
+                                <PermissionGate permission="view_lead">
+                                    <LeadDashboard />
+                                </PermissionGate>
+                            } />
+                            <Route path="/leads/list" element={
+                                <PermissionGate permission="view_lead">
+                                    <LeadList />
+                                </PermissionGate>
+                            } />
+                            <Route path="/leads/new" element={
+                                <PermissionGate permission="add_lead">
+                                    <LeadForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/leads/edit/:id" element={
+                                <PermissionGate permission="change_lead">
+                                    <LeadForm />
+                                </PermissionGate>
+                            } />
+                            <Route path="/leads/:id" element={
+                                <PermissionGate permission="view_lead">
+                                    <LeadDetail />
+                                </PermissionGate>
+                            } />
+
+
                         </Route>
 
                         <Route path="/" element={<Navigate to="/login" replace />} />

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import Navbar from './Navbar';
+import ScheduleSidebar from './ScheduleSidebar';
 
 const Layout: React.FC = () => {
     const [collapsed, setCollapsed] = useState(false);
@@ -8,13 +10,17 @@ const Layout: React.FC = () => {
     return (
         <div className="flex h-screen bg-background text-foreground transition-colors duration-300 overflow-hidden">
             <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
-            <main className="flex-1 relative overflow-y-auto focus:outline-none">
-                <div className="py-6 h-full">
-                    <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 h-full">
-                        <Outlet />
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                <Navbar />
+                <main className="flex-1 relative overflow-y-auto focus:outline-none">
+                    <div className="py-6">
+                        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8">
+                            <Outlet />
+                        </div>
                     </div>
-                </div>
-            </main>
+                </main>
+            </div>
+            <ScheduleSidebar />
         </div>
     );
 };

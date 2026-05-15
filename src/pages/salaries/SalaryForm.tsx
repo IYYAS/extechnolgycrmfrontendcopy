@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSalary, createSalary, updateSalary } from './salaryService';
-import { getUsers } from '../user/userService';
+import SearchableUserSelect from '../../components/SearchableUserSelect';
 import {
     ArrowLeft, Save, Loader2, User, DollarSign, AlertCircle, CheckCircle2
 } from 'lucide-react';
@@ -14,7 +14,6 @@ const SalaryForm: React.FC = () => {
     const [loading, setLoading] = useState(isEdit);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [users, setUsers] = useState<any[]>([]);
 
     const [formData, setFormData] = useState<any>({
         start_date: new Date().toISOString().slice(0, 10),
@@ -34,8 +33,6 @@ const SalaryForm: React.FC = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const userData = await getUsers(1, '');
-                setUsers(userData.results || []);
                 if (isEdit && id) {
                     const salary = await getSalary(parseInt(id));
                     setFormData({ ...salary, employee: salary.employee.toString() });
@@ -104,12 +101,10 @@ const SalaryForm: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label className={labelCls}>Employee</label>
-                                <select value={formData.employee} onChange={e => setFormData({ ...formData, employee: e.target.value })} className={inputCls} required>
-                                    <option value="">Select Employee...</option>
-                                    {users.map(u => (
-                                        <option key={u.id} value={u.id}>{u.username}</option>
-                                    ))}
-                                </select>
+                                <SearchableUserSelect
+                                    value={formData.employee}
+                                    onChange={(val) => setFormData({ ...formData, employee: val?.toString() || '' })}
+                                />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>

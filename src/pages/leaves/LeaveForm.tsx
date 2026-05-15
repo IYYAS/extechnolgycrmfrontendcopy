@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getLeave, createLeave, updateLeave } from './leaveService';
-import { getUsers } from '../user/userService';
+import SearchableUserSelect from '../../components/SearchableUserSelect';
 import {
     ArrowLeft,
     Save,
@@ -22,7 +22,6 @@ const LeaveForm: React.FC = () => {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const [users, setUsers] = useState<any[]>([]);
 
     const [formData, setFormData] = useState<any>({
         start_date: new Date().toISOString().split('T')[0],
@@ -36,9 +35,6 @@ const LeaveForm: React.FC = () => {
     useEffect(() => {
         const loadInitialData = async () => {
             try {
-                const userData = await getUsers(1, '');
-                setUsers(userData.results || []);
-
                 if (isEdit && id) {
                     const leave = await getLeave(parseInt(id));
                     setFormData({
@@ -121,12 +117,10 @@ const LeaveForm: React.FC = () => {
                         </div>
                         <div>
                             <label className={labelCls}>Employee</label>
-                            <select value={formData.employee} onChange={e => setFormData({ ...formData, employee: e.target.value })} className={inputCls} required>
-                                <option value="">Select Employee...</option>
-                                {users.map(u => (
-                                    <option key={u.id} value={u.id}>{u.username}</option>
-                                ))}
-                            </select>
+                            <SearchableUserSelect
+                                value={formData.employee}
+                                onChange={(val) => setFormData({ ...formData, employee: val?.toString() || '' })}
+                            />
                         </div>
                     </div>
 
@@ -187,14 +181,12 @@ const LeaveForm: React.FC = () => {
                                 </select>
                             </div>
                             {formData.status !== 'Pending' && (
-                                <div className="max-w-[200px] mt-4">
+                                <div className="max-w-[300px] mt-4">
                                     <label className={labelCls}>{formData.status === 'Approved' ? 'Approved By' : 'Actioned By'}</label>
-                                    <select value={formData.approved_by} onChange={e => setFormData({ ...formData, approved_by: e.target.value })} className={inputCls} required={formData.status === 'Approved'}>
-                                        <option value="">Select User...</option>
-                                        {users.map(u => (
-                                            <option key={u.id} value={u.id}>{u.username}</option>
-                                        ))}
-                                    </select>
+                                    <SearchableUserSelect
+                                        value={formData.approved_by}
+                                        onChange={(val) => setFormData({ ...formData, approved_by: val?.toString() || '' })}
+                                    />
                                 </div>
                             )}
                         </div>

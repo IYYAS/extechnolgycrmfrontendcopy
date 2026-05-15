@@ -5,9 +5,13 @@ export interface Notification {
     user: number;
     activity: number | null;
     comment: number | null;
+    project: number | null;
     message: string;
     is_read: boolean;
     created_at: string;
+    notification_type?: 'server_alert' | 'domain_alert' | string | null;
+    project_name?: string;
+    expiry_date?: string;
 }
 
 export interface NotificationResponse {
@@ -33,4 +37,8 @@ export const getUnreadCount = async (): Promise<number> => {
 
 export const markAsRead = async (id: number): Promise<void> => {
     await api.patch(`/notifications/${id}/`, { is_read: true });
+};
+
+export const markAllAsRead = async (): Promise<void> => {
+    await api.put('/notifications/mark-all-read/');
 };

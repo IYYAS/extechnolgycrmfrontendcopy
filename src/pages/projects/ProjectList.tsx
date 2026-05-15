@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProjects, deleteProject } from './projectService';
+import Pagination from '../../components/Pagination';
 import { usePermission } from '../../hooks/usePermission';
 import type { Project } from './projectService';
 import {
@@ -16,8 +17,111 @@ import {
     Eye,
     Edit2,
     Trash2,
-    ClipboardList
+    ClipboardList,
+    Filter,
+    Layers,
+    UserCircle,
+    Check,
+    AlertCircle
 } from 'lucide-react';
+import { getProjectNatures, getClients } from './projectService';
+
+interface FilterDropdownProps {
+    label: string;
+    value: string;
+    options: { label: string, value: string }[];
+    onChange: (value: string) => void;
+    icon?: React.ReactNode;
+    align?: 'left' | 'right';
+}
+
+const FilterDropdown: React.FC<FilterDropdownProps> = ({ label, value, options, onChange, icon, align = 'left' }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [dropdownSearch, setDropdownSearch] = useState('');
+    const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (!isOpen) setDropdownSearch('');
+    }, [isOpen]);
+
+    const selectedOption = options.find(opt => opt.value === value);
+    const filteredOptions = options.filter(opt => 
+        opt.label.toLowerCase().includes(dropdownSearch.toLowerCase())
+    );
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-background border rounded-xl text-sm font-medium transition-all min-w-[160px] justify-between
+                    ${isOpen ? 'border-primary ring-2 ring-primary/20 shadow-lg' : 'border-border hover:border-primary/50'}`}
+            >
+                <div className="flex items-center gap-2 overflow-hidden">
+                    {icon && <span className="text-muted shrink-0">{icon}</span>}
+                    <span className={`truncate ${value ? 'text-foreground' : 'text-muted'}`}>
+                        {selectedOption ? selectedOption.label : label}
+                    </span>
+                </div>
+                <div className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+                    <svg className="w-4 h-4 text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </div>
+            </button>
+
+            {isOpen && (
+                <div className={`absolute z-50 w-full mt-2 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 min-w-[220px] ${align === 'right' ? 'right-0' : 'left-0'}`}>
+                    <div className="p-2 border-b border-border">
+                        <div className="relative">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-muted" size={14} />
+                            <input
+                                autoFocus
+                                type="text"
+                                placeholder="Search..."
+                                value={dropdownSearch}
+                                onChange={(e) => setDropdownSearch(e.target.value)}
+                                className="w-full pl-8 pr-3 py-1.5 bg-muted/5 border border-border rounded-lg text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/30 transition-all"
+                            />
+                        </div>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto p-1.5 custom-scrollbar">
+                        <button
+                            onClick={() => { onChange(''); setIsOpen(false); }}
+                            className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all hover:bg-muted/10 
+                                ${!value ? 'bg-primary/10 text-primary font-bold' : 'text-muted hover:text-foreground'}`}
+                        >
+                            {label}
+                        </button>
+                        {filteredOptions.length > 0 ? (
+                            filteredOptions.map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                                    className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all hover:bg-muted/10 mt-0.5
+                                        ${value === opt.value ? 'bg-primary/10 text-primary font-bold' : 'text-foreground/80 hover:text-foreground'}`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))
+                        ) : (
+                            <div className="px-3 py-4 text-center text-xs text-muted">No results found</div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 const ProjectList: React.FC = () => {
     const { hasPermission } = usePermission();
@@ -28,18 +132,30 @@ const ProjectList: React.FC = () => {
     const [totalCount, setTotalCount] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [natureFilter, setNatureFilter] = useState('');
+    const [clientFilter, setClientFilter] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    const [datePreset, setDatePreset] = useState('');
+    const [stats, setStats] = useState({ total: 0, pending: 0, progressing: 0, completed: 0 });
+    const [natures, setNatures] = useState<{ label: string, value: string }[]>([]);
+    const [clients, setClients] = useState<{ label: string, value: string }[]>([]);
     const navigate = useNavigate();
 
     const ITEMS_PER_PAGE = 10;
     const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-    const fetchProjects = async (page: number = 1, search: string = '') => {
+    const fetchProjects = async (page: number = 1, search: string = '', filters?: { status?: string; nature?: string; client?: string; start_date?: string; end_date?: string }) => {
         setLoading(true);
         setError(null);
         try {
-            const data = await getProjects(page, search);
+            const data = await getProjects(page, search, filters);
             setProjects(data.results);
             setTotalCount(data.count);
+            if (data.stats) {
+                setStats(data.stats);
+            }
         } catch (error: any) {
             console.error('Failed to fetch projects:', error);
             setError(error.response?.data?.detail || 'Failed to load projects. Please try again.');
@@ -64,19 +180,47 @@ const ProjectList: React.FC = () => {
     };
 
     useEffect(() => {
+        const fetchFilters = async () => {
+            try {
+                const [natureData, clientData] = await Promise.all([
+                    getProjectNatures(),
+                    getClients()
+                ]);
+                setNatures(natureData.map(n => ({ label: n.name, value: n.name })));
+                setClients(clientData.map(c => ({ label: c.company_name, value: c.company_name })));
+            } catch (error) {
+                console.error('Failed to fetch filter options:', error);
+            }
+        };
+        fetchFilters();
+    }, []);
+
+    useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
             if (currentPage !== 1) {
                 setCurrentPage(1);
             } else {
-                fetchProjects(1, searchTerm);
+                fetchProjects(1, searchTerm, { 
+                    status: statusFilter, 
+                    nature: natureFilter, 
+                    client: clientFilter,
+                    start_date: startDate,
+                    end_date: endDate
+                });
             }
         }, 500);
 
         return () => clearTimeout(delayDebounceFn);
-    }, [searchTerm]);
+    }, [searchTerm, statusFilter, natureFilter, clientFilter, startDate, endDate]);
 
     useEffect(() => {
-        fetchProjects(currentPage, searchTerm);
+        fetchProjects(currentPage, searchTerm, { 
+            status: statusFilter, 
+            nature: natureFilter, 
+            client: clientFilter,
+            start_date: startDate,
+            end_date: endDate
+        });
     }, [currentPage]);
 
     const getStatusStyles = (status: string) => {
@@ -98,6 +242,31 @@ const ProjectList: React.FC = () => {
             month: 'short',
             day: 'numeric'
         });
+    };
+
+    const toYMD = (d: Date) => d.toISOString().split('T')[0];
+
+    const applyDatePreset = (preset: string) => {
+        setDatePreset(preset);
+        const today = new Date();
+        if (preset === 'today') {
+            const ymd = toYMD(today);
+            setStartDate(ymd); setEndDate(ymd);
+        } else if (preset === 'week') {
+            const mon = new Date(today);
+            mon.setDate(today.getDate() - today.getDay() + 1);
+            const sun = new Date(mon);
+            sun.setDate(mon.getDate() + 6);
+            setStartDate(toYMD(mon)); setEndDate(toYMD(sun));
+        } else if (preset === 'month') {
+            const first = new Date(today.getFullYear(), today.getMonth(), 1);
+            const last = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            setStartDate(toYMD(first)); setEndDate(toYMD(last));
+        } else if (preset === 'custom') {
+            // keep existing dates, just switch to custom mode
+        } else {
+            setStartDate(''); setEndDate('');
+        }
     };
 
     return (
@@ -135,36 +304,131 @@ const ProjectList: React.FC = () => {
                 </div>
             </div>
 
-            {/* Quick Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="p-4 bg-card border border-border rounded-2xl shadow-sm">
                     <p className="text-muted text-xs font-semibold uppercase tracking-wider">Total Projects</p>
                     <div className="flex items-end justify-between mt-1">
-                        <p className="text-2xl font-bold text-foreground">{totalCount}</p>
+                        <p className="text-2xl font-bold text-foreground">{stats.total}</p>
                         <Briefcase className="text-primary/20" size={24} />
                     </div>
                 </div>
                 <div className="p-4 bg-card border border-border rounded-2xl shadow-sm">
                     <p className="text-muted text-xs font-semibold uppercase tracking-wider">Progressing</p>
                     <div className="flex items-end justify-between mt-1">
-                        <p className="text-2xl font-bold text-amber-500">{projects.filter(p => p.status === 'Progressing').length}</p>
+                        <p className="text-2xl font-bold text-amber-500">{stats.progressing}</p>
                         <Clock className="text-amber-500/20" size={24} />
+                    </div>
+                </div>
+                <div className="p-4 bg-card border border-border rounded-2xl shadow-sm">
+                    <p className="text-muted text-xs font-semibold uppercase tracking-wider">Completed</p>
+                    <div className="flex items-end justify-between mt-1">
+                        <p className="text-2xl font-bold text-emerald-500">{stats.completed}</p>
+                        <Check className="text-emerald-500/20" size={24} />
+                    </div>
+                </div>
+                <div className="p-4 bg-card border border-border rounded-2xl shadow-sm">
+                    <p className="text-muted text-xs font-semibold uppercase tracking-wider">Pending</p>
+                    <div className="flex items-end justify-between mt-1">
+                        <p className="text-2xl font-bold text-blue-500">{stats.pending}</p>
+                        <AlertCircle className="text-blue-500/20" size={24} />
                     </div>
                 </div>
             </div>
 
             {/* Filter & Search */}
-            <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-sm">
-                <div className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="relative flex-1 w-full max-w-md">
+            <div className="bg-card border border-border rounded-2xl shadow-sm">
+                <div className="p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
+                    <div className="relative w-full lg:max-w-xs">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
                         <input
                             type="text"
-                            placeholder="Search projects by name or description..."
+                            placeholder="Search projects..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                         />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                        <FilterDropdown
+                            label="All Status"
+                            value={statusFilter}
+                            options={[
+                                { label: 'Pending', value: 'Pending' },
+                                { label: 'Progressing', value: 'Progressing' },
+                                { label: 'Completed', value: 'Completed' }
+                            ]}
+                            onChange={setStatusFilter}
+                            icon={<Filter size={16} />}
+                        />
+                        <FilterDropdown
+                            label="All Natures"
+                            value={natureFilter}
+                            options={natures}
+                            onChange={setNatureFilter}
+                            icon={<Layers size={16} />}
+                        />
+                        <FilterDropdown
+                            label="All Clients"
+                            value={clientFilter}
+                            options={clients}
+                            onChange={setClientFilter}
+                            icon={<UserCircle size={16} />}
+                            align="right"
+                        />
+
+                        {/* Date Filter */}
+                        <div className="flex items-center gap-2">
+                            <FilterDropdown
+                                label="All Dates"
+                                value={datePreset}
+                                options={[
+                                    { label: 'Today', value: 'today' },
+                                    { label: 'This Week', value: 'week' },
+                                    { label: 'This Month', value: 'month' },
+                                    { label: 'Custom', value: 'custom' },
+                                ]}
+                                onChange={applyDatePreset}
+                                icon={<Calendar size={16} />}
+                            />
+
+                            {datePreset === 'custom' && (
+                                <div className="flex items-center gap-1.5 bg-background border border-border rounded-xl px-3 py-2.5 shadow-sm">
+                                    <input
+                                        type="date"
+                                        value={startDate}
+                                        onChange={e => setStartDate(e.target.value)}
+                                        className="bg-transparent border-none outline-none text-xs font-bold focus:ring-0 w-[108px] cursor-pointer"
+                                        title="Start Date"
+                                    />
+                                    <span className="text-muted text-[9px] font-black px-1">TO</span>
+                                    <input
+                                        type="date"
+                                        value={endDate}
+                                        onChange={e => setEndDate(e.target.value)}
+                                        className="bg-transparent border-none outline-none text-xs font-bold focus:ring-0 w-[108px] cursor-pointer"
+                                        title="End Date"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {(statusFilter || natureFilter || clientFilter || datePreset || startDate || endDate || searchTerm) && (
+                            <button
+                                onClick={() => {
+                                    setStatusFilter('');
+                                    setNatureFilter('');
+                                    setClientFilter('');
+                                    setStartDate('');
+                                    setEndDate('');
+                                    setDatePreset('');
+                                    setSearchTerm('');
+                                }}
+                                className="text-sm font-bold text-primary hover:text-primary-hover transition-colors px-2"
+                            >
+                                Clear All
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -199,19 +463,28 @@ const ProjectList: React.FC = () => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-muted/5 text-muted text-xs font-semibold uppercase tracking-wider">
+                                        <th className="px-6 py-4 w-12">#</th>
                                         <th className="px-6 py-4">Project Details</th>
                                         <th className="px-6 py-4">Status</th>
                                         <th className="px-6 py-4">Nature</th>
                                         <th className="px-6 py-4">Client</th>
+                                        <th className="px-6 py-4">Created Date</th>
+                                        <th className="px-6 py-4">Updated At</th>
                                         <th className="px-6 py-4 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {projects.map((project) => {
+                                    {projects.map((project, index) => {
                                         const baseInfo = project.project_base_informations?.[0];
                                         const clientInfo = project.project_clients?.[0];
+                                        const serialNumber = (currentPage - 1) * ITEMS_PER_PAGE + index + 1;
                                         return (
                                             <tr key={project.id} className="group hover:bg-muted/5 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="w-8 h-8 rounded-lg bg-muted/20 flex items-center justify-center text-[10px] font-black text-muted group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                                                        {String(serialNumber).padStart(2, '0')}
+                                                    </div>
+                                                </td>
                                                 <td
                                                     className="px-6 py-4 cursor-pointer"
                                                     onClick={() => navigate(`/projects/${project.id}`)}
@@ -239,8 +512,24 @@ const ProjectList: React.FC = () => {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div>
-                                                        <p className="text-foreground font-medium text-sm">{clientInfo?.company_name || 'N/A'}</p>
-                                                        <p className="text-muted text-xs">{clientInfo?.contact_person}</p>
+                                                        <p className="text-foreground font-medium text-sm">
+                                                            {project.project_business_addresses?.[0]?.legal_name || clientInfo?.company_name || 'N/A'}
+                                                        </p>
+                                                        <p className="text-muted text-xs">
+                                                            {project.project_business_addresses?.[0]?.attention_name || clientInfo?.contact_person}
+                                                        </p>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center text-muted text-sm whitespace-nowrap">
+                                                        <Calendar size={14} className="mr-1.5 opacity-60" />
+                                                        {formatDate(project.created_at)}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center text-muted text-sm whitespace-nowrap">
+                                                        <Clock size={14} className="mr-1.5 opacity-60" />
+                                                        {formatDate(project.updated_at)}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
@@ -391,57 +680,14 @@ const ProjectList: React.FC = () => {
             </div>
 
             {/* Pagination */}
-            {!loading && totalCount > 0 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-2 py-4">
-                    <p className="text-muted text-sm font-medium">
-                        Showing <span className="text-foreground">{Math.min((currentPage - 1) * ITEMS_PER_PAGE + 1, totalCount)}</span> to{' '}
-                        <span className="text-foreground">{Math.min(currentPage * ITEMS_PER_PAGE, totalCount)}</span> of{' '}
-                        <span className="text-foreground">{totalCount}</span> projects
-                    </p>
-                    <div className="flex items-center space-x-2">
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                            disabled={currentPage === 1}
-                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border ${currentPage === 1
-                                ? 'bg-muted/5 border-border text-muted/30 cursor-not-allowed'
-                                : 'bg-card border-border text-foreground hover:bg-muted/10'
-                                }`}
-                        >
-                            Previous
-                        </button>
-                        <div className="flex items-center space-x-1.5">
-                            {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
-                                .map((page, index, array) => (
-                                    <React.Fragment key={page}>
-                                        {index > 0 && array[index - 1] !== page - 1 && (
-                                            <span className="text-muted font-bold px-1">...</span>
-                                        )}
-                                        <button
-                                            onClick={() => setCurrentPage(page)}
-                                            className={`w-10 h-10 rounded-xl text-sm font-bold transition-all ${currentPage === page
-                                                ? 'bg-primary text-white shadow-lg shadow-primary/25 scale-105'
-                                                : 'bg-card text-muted hover:bg-muted/10 hover:text-primary border border-border'
-                                                }`}
-                                        >
-                                            {page}
-                                        </button>
-                                    </React.Fragment>
-                                ))}
-                        </div>
-                        <button
-                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                            disabled={currentPage === totalPages}
-                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all border ${currentPage === totalPages
-                                ? 'bg-muted/5 border-border text-muted/30 cursor-not-allowed'
-                                : 'bg-card border-border text-foreground hover:bg-muted/10'
-                                }`}
-                        >
-                            Next
-                        </button>
-                    </div>
-                </div>
-            )}
+            <Pagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+                itemName="projects"
+            />
         </div>
     );
 };

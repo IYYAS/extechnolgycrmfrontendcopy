@@ -16,7 +16,8 @@ import {
     Clock,
     Plus,
     Briefcase,
-    Trash2
+    Trash2,
+    Landmark
 } from 'lucide-react';
 
 const CompanyProfilePage: React.FC = () => {
@@ -245,6 +246,38 @@ const CompanyProfilePage: React.FC = () => {
                                             {selectedProfile.updated_at ? new Date(selectedProfile.updated_at).toLocaleString() : '—'}
                                         </p>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Bank Details Section */}
+                        <div className="p-8 border-t border-border bg-muted/5">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-2 bg-primary/10 text-primary rounded-xl">
+                                    <Landmark size={20} />
+                                </div>
+                                <h3 className="text-xl font-bold text-foreground">Bank Account Details</h3>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                                <div>
+                                    <p className="text-[10px] font-black text-muted uppercase tracking-widest mb-1">Bank Name</p>
+                                    <p className="text-foreground font-bold">{selectedProfile.bank_name || '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-muted uppercase tracking-widest mb-1">Account Name</p>
+                                    <p className="text-foreground font-medium">{selectedProfile.account_name || '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-muted uppercase tracking-widest mb-1">Account Number</p>
+                                    <p className="text-foreground font-mono font-bold">{selectedProfile.account_number || '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-muted uppercase tracking-widest mb-1">IFSC Code</p>
+                                    <p className="text-foreground font-mono font-medium">{selectedProfile.ifsc_code || '—'}</p>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <p className="text-[10px] font-black text-muted uppercase tracking-widest mb-1">UPI ID</p>
+                                    <p className="text-foreground font-mono font-medium">{selectedProfile.upi_id || '—'}</p>
                                 </div>
                             </div>
                         </div>

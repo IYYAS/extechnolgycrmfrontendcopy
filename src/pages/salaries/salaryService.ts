@@ -24,6 +24,11 @@ export interface SalaryListResponse {
     next: string | null;
     previous: string | null;
     results: Salary[];
+    statistics?: {
+        total_basic: number;
+        paid_count: number;
+        unpaid_count: number;
+    };
 }
 
 export const getSalaries = async (
@@ -60,4 +65,35 @@ export const updateSalary = async (id: number, data: any): Promise<Salary> => {
 
 export const deleteSalary = async (id: number): Promise<void> => {
     await api.delete(`/salaries/${id}/`);
+};
+
+export interface EmployeeSalarySummary {
+    id: number;
+    username: string;
+    first_name: string;
+    last_name: string;
+    total_paid_amount: number;
+    total_unpaid_amount: number;
+    record_count: number;
+    last_payment_date: string | null;
+}
+
+export interface EmployeeSalarySummaryResponse {
+    count: number;
+    results: EmployeeSalarySummary[];
+    statistics?: {
+        total_basic: number;
+        paid_count: number;
+        unpaid_count: number;
+    };
+}
+
+export const getEmployeeSalarySummaries = async (
+    page: number = 1,
+    search: string = ''
+): Promise<EmployeeSalarySummaryResponse> => {
+    const response = await api.get<EmployeeSalarySummaryResponse>('/salaries/summary/', {
+        params: { page, search }
+    });
+    return response.data;
 };

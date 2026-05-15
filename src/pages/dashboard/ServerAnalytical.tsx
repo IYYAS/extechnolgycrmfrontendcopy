@@ -91,12 +91,21 @@ const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
     }
 
     const filteredServers = serverData.servers_list?.filter(server => {
+        const isExpired = server.status?.toLowerCase() !== 'active' || (server.days_until_expiry !== null && server.days_until_expiry !== undefined && server.days_until_expiry < 0);
+        
         if (activeFilter === 'all') return true;
-        if (activeFilter === 'active') return server.status?.toLowerCase() === 'active';
-        if (activeFilter === 'expired') return server.status?.toLowerCase() !== 'active';
+        if (activeFilter === 'active') return !isExpired;
+        if (activeFilter === 'expired') return isExpired;
         if (activeFilter === 'paid') return server.payment_status?.toLowerCase() === 'paid';
         if (activeFilter === 'unpaid') return server.payment_status?.toLowerCase() !== 'paid';
         return true;
+    }).sort((a, b) => {
+        const aDays = a.days_until_expiry ?? 9999;
+        const bDays = b.days_until_expiry ?? 9999;
+        const isExpiredA = aDays < 0;
+        const isExpiredB = bDays < 0;
+        if (isExpiredA !== isExpiredB) return isExpiredA ? 1 : -1;
+        return aDays - bDays;
     });
 
     // Donut chart for server type
@@ -309,7 +318,7 @@ const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
                                     <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${s.days_until_expiry != null && s.days_until_expiry < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
                                         {s.days_until_expiry != null
                                             ? (s.days_until_expiry < 0
-                                                ? `Overdue by ${Math.abs(s.days_until_expiry)} days`
+                                                ? 'EXPIRED'
                                                 : `${s.days_until_expiry} days left`)
                                             : 'Expires'}
                                     </p>
@@ -341,24 +350,41 @@ const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
 
                     <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <AnimatePresence mode="popLayout">
-                            {filteredServers?.map((server, idx) => (
-                                <motion.div
-                                    layout
-                                    key={server.id}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    transition={{ type: 'spring', stiffness: 300, damping: 28, delay: idx * 0.05 }}
-                                    className="bg-card border border-border/50 rounded-2xl p-5 shadow-md hover:shadow-xl hover:border-border transition-all group"
-                                >
-                                    <div className="flex justify-between items-start mb-5">
+                            {filteredServers?.map((server, idx) => {
+                                const isExpired = server.status?.toLowerCase() !== 'active' || (server.days_until_expiry !== undefined && server.days_until_expiry < 0);
+                                return (
+                                    <motion.div
+                                        layout
+                                        key={server.id}
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.9 }}
+                                        transition={{ type: 'spring', stiffness: 300, damping: 28, delay: idx * 0.05 }}
+                                        className={`bg-card border ${
+                                            server.days_until_expiry !== undefined && server.days_until_expiry > 15 && server.days_until_expiry <= 30
+                                                ? 'border-amber-500/50 shadow-amber-500/10'
+                                                : server.days_until_expiry !== undefined && server.days_until_expiry <= 15
+                                                    ? 'border-rose-500/50 shadow-rose-500/10'
+                                                    : 'border-border/50'
+                                        } rounded-2xl p-5 shadow-md hover:shadow-xl transition-all group relative overflow-hidden`}
+                                    >
+                                    {(server.days_until_expiry !== undefined && server.days_until_expiry <= 30) && (
+                                        <div className={`absolute top-0 left-0 w-full text-center py-0.5 text-[8px] font-black uppercase tracking-widest ${
+                                            server.days_until_expiry <= 15
+                                                ? 'bg-rose-500/20 text-rose-600 dark:text-rose-400'
+                                                : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                                        }`}>
+                                            {server.days_until_expiry < 0 ? 'Expired' : 'Expiring Soon'}
+                                        </div>
+                                    )}
+                                    <div className={`flex justify-between items-start mb-5 ${server.days_until_expiry !== undefined && server.days_until_expiry <= 30 ? 'mt-3' : ''}`}>
                                         <div className="min-w-0">
                                             <p className="text-base font-black text-foreground uppercase tracking-tight truncate">{server.name}</p>
                                             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest bg-slate-500/10 border border-slate-500/20 px-2 py-0.5 rounded mt-2 inline-block">
                                                 {server.server_type}
                                             </span>
                                         </div>
-                                        <div className="w-10 h-10 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/10 transition-colors flex-shrink-0">
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-500/5 border border-indigo-500/10 flex items-center justify-center group-hover:bg-indigo-500/10 transition-colors flex-shrink-0 z-10">
                                             <Server size={18} className="text-indigo-400" />
                                         </div>
                                     </div>
@@ -378,11 +404,9 @@ const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
                                                 <p className="font-black text-foreground">
                                                     {server.purchase_date ? new Date(server.purchase_date).toLocaleDateString() : '—'} / {new Date(server.expiration_date).toLocaleDateString()}
                                                 </p>
-                                                {server.days_until_expiry != null && (
-                                                    <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${server.days_until_expiry < 0 ? 'text-rose-600' : 'text-slate-500'}`}>
-                                                        {server.days_until_expiry < 0
-                                                            ? `Overdue: ${Math.abs(server.days_until_expiry)} days`
-                                                            : `${server.days_until_expiry} days left`}
+                                                {server.days_until_expiry != null && server.days_until_expiry >= 0 && (
+                                                    <p className="text-[9px] font-bold uppercase tracking-widest mt-0.5 text-slate-500">
+                                                        {server.days_until_expiry} days left
                                                     </p>
                                                 )}
                                             </div>
@@ -403,11 +427,11 @@ const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
 
                                     <div className="flex items-center justify-between mt-5 pt-4 border-t border-border/50">
                                         <div className="flex gap-2">
-                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${(server.effective_status || server.status)?.toLowerCase() === 'active'
+                                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${!isExpired
                                                     ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
                                                     : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
                                                 }`}>
-                                                {(server.effective_status || server.status).toUpperCase()}
+                                                {isExpired ? 'EXPIRED' : (server.effective_status || server.status).toUpperCase()}
                                             </span>
                                             <span className={`text-[9px] font-black px-2 py-0.5 rounded-md border shadow-sm transition-colors ${server.payment_status?.toLowerCase() === 'paid'
                                                     ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
@@ -422,8 +446,9 @@ const ServerAnalytical: React.FC<ServerAnalyticalProps> = ({ serverData }) => {
                                             </span>
                                         </div>
                                     </div>
-                                </motion.div>
-                            ))}
+                                    </motion.div>
+                                );
+                            })}
                         </AnimatePresence>
                     </motion.div>
 

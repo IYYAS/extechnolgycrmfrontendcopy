@@ -14,6 +14,7 @@ export interface ProjectServer {
     provider: Provider[];
     server_type: string;
     name: string;
+    project_name?: string;
     accrued_by: string;
     purchased_from: string;
     purchase_date: string;
@@ -23,6 +24,7 @@ export interface ProjectServer {
     payment_status: string;
     project: number | null;
     client_address: number | null;
+    invoice_status?: string;
 }
 
 export interface ProjectServerListResponse {
@@ -30,12 +32,41 @@ export interface ProjectServerListResponse {
     next: string | null;
     previous: string | null;
     results: ProjectServer[];
+    statistics?: {
+        total: number;
+        active: number;
+        pending: number;
+        expired: number;
+    };
 }
 
-export const getProjectServers = async (page: number = 1, search: string = ''): Promise<ProjectServerListResponse> => {
-    const url = search
-        ? `/project-servers/?page=${page}&search=${encodeURIComponent(search)}`
-        : `/project-servers/?page=${page}`;
+export const getProjectServers = async (
+    page: number = 1, 
+    search: string = '',
+    filters: {
+        status?: string;
+        payment_status?: string;
+        invoice_status?: string;
+        min_cost?: string;
+        max_cost?: string;
+        start_date?: string;
+        end_date?: string;
+    } = {}
+): Promise<ProjectServerListResponse> => {
+    let url = `/project-servers/?page=${page}`;
+    
+    if (search) {
+        url += `&search=${encodeURIComponent(search)}`;
+    }
+    
+    if (filters.status) url += `&status=${encodeURIComponent(filters.status)}`;
+    if (filters.payment_status) url += `&payment_status=${encodeURIComponent(filters.payment_status)}`;
+    if (filters.invoice_status) url += `&invoice_status=${encodeURIComponent(filters.invoice_status)}`;
+    if (filters.min_cost) url += `&min_cost=${encodeURIComponent(filters.min_cost)}`;
+    if (filters.max_cost) url += `&max_cost=${encodeURIComponent(filters.max_cost)}`;
+    if (filters.start_date) url += `&start_date=${encodeURIComponent(filters.start_date)}`;
+    if (filters.end_date) url += `&end_date=${encodeURIComponent(filters.end_date)}`;
+
     const response = await api.get<ProjectServerListResponse>(url);
     return response.data;
 };

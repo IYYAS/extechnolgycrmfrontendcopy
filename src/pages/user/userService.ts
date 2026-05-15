@@ -4,6 +4,7 @@ import { api } from '../../api/api';
 export interface Role {
   id: number;
   name: string;
+  permissions?: any[];
 }
 
 export interface User {
@@ -15,6 +16,9 @@ export interface User {
   phone_number: string | null;
   designation: string | null;
   roles: Role[];
+  role?: Role;
+  profile_pic: string | null;
+  date_joined: string;
 }
 export interface UserListResponse {
   count: number;
@@ -25,8 +29,23 @@ export interface UserListResponse {
 
 
 
-export const getUsers = async (page: number = 1, search: string = ''): Promise<UserListResponse> => {
-  const url = search ? `/users/?page=${page}&search=${encodeURIComponent(search)}` : `/users/?page=${page}`;
+export const getUsers = async (
+  page: number = 1, 
+  search: string = '', 
+  designation: string = '', 
+  role: string = '', 
+  status: string = '',
+  startDate: string = '',
+  endDate: string = ''
+): Promise<UserListResponse> => {
+  let url = `/users/?page=${page}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (designation) url += `&designation=${encodeURIComponent(designation)}`;
+  if (role) url += `&role=${encodeURIComponent(role)}`;
+  if (status) url += `&status=${encodeURIComponent(status)}`;
+  if (startDate) url += `&start_date=${startDate}`;
+  if (endDate) url += `&end_date=${endDate}`;
+  
   const response = await api.get<UserListResponse>(url);
   return response.data;
 };
@@ -67,13 +86,20 @@ const sanitizePayload = (obj: any): any => {
 };
 
 export const createUser = async (userData: any): Promise<User> => {
-  const response = await api.post<User>('/users/', sanitizePayload(userData));
+  const isFormData = userData instanceof FormData;
+  const payload = isFormData ? userData : sanitizePayload(userData);
+  const response = await api.post<User>('/users/', payload, {
+    headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined
+  });
   return response.data;
 };
 
 export const updateUser = async (userId: number, userData: any): Promise<User> => {
-  // userData should contain role IDs as per the request: "all roles update by id"
-  const response = await api.put<User>(`/users/${userId}/`, sanitizePayload(userData));
+  const isFormData = userData instanceof FormData;
+  const payload = isFormData ? userData : sanitizePayload(userData);
+  const response = await api.put<User>(`/users/${userId}/`, payload, {
+    headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined
+  });
   return response.data;
 };
 
@@ -141,6 +167,12 @@ export interface TeamPerformance {
 }
 
 export interface TeamPerformanceResponse {
+    count: number;
+    total_pages: number;
+    current_page: number;
+    page_size: number;
+    next: string | null;
+    previous: string | null;
     total_teams: number;
     total_pending: number;
     total_completed: number;
@@ -148,9 +180,10 @@ export interface TeamPerformanceResponse {
     teams: TeamPerformance[];
 }
 
-export const getTeamPerformance = async (teamId?: number): Promise<any> => {
-  const url = teamId ? `/team-performance/?team_id=${teamId}` : '/team-performance/';
-  const response = await api.get<any>(url);
+export const getTeamPerformance = async (teamId?: number, page: number = 1, pageSize: number = 10): Promise<TeamPerformanceResponse> => {
+  let url = `/team-performance/?page=${page}&page_size=${pageSize}`;
+  if (teamId) url += `&team_id=${teamId}`;
+  const response = await api.get<TeamPerformanceResponse>(url);
   return response.data;
 };
 
@@ -197,7 +230,17 @@ export const getUserWorkDetails = async (userId: number): Promise<UserWorkDetail
     return response.data;
 };
 
+export const getMe = async (): Promise<User> => {
+    const response = await api.get<User>('/users/me/');
+    return response.data;
+};
+
 export const adminChangePassword = async (userId: number, data: any): Promise<any> => {
     const response = await api.put(`/admin-change-password/${userId}/`, sanitizePayload(data));
+    return response.data;
+};
+
+export const getDesignations = async (): Promise<string[]> => {
+    const response = await api.get<string[]>('/users/designations/');
     return response.data;
 };

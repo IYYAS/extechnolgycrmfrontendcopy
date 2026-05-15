@@ -6,7 +6,7 @@ import {
     Clock, Building2, ClipboardList, Wallet, CalendarCheck, 
     DollarSign, Receipt, UserCheck, BarChart3, Globe, 
     UserCog, Layers, Settings, Shield, ChevronRight, 
-    CheckCircle2, Plus, X, Search 
+    CheckCircle2, Plus, X, Search, MessageSquare, Target, Bell
 } from 'lucide-react';
 
 const SIDEBAR_MODULE_MAP: Record<string, string> = {
@@ -14,6 +14,7 @@ const SIDEBAR_MODULE_MAP: Record<string, string> = {
     'projectstats': 'Project Statistics',
     'server_stats': 'Server Statistics',
     'domain_stats': 'Domain Statistics',
+    'exbot_stats': 'Exbot Statistics',
     'reports': 'Reports',
     'user': 'Users',
     'employee': 'Employees',
@@ -55,14 +56,25 @@ const SIDEBAR_MODULE_MAP: Record<string, string> = {
     'projectservicemember': 'Project Service Members',
     'projectserviceteam': 'Project Service Teams',
     'projectteam': 'Project Teams',
-    'projectteammember': 'Project Team Members'
+    'projectteammember': 'Project Team Members',
+    'projectexbot': 'Exbots (WhatsApp Bots)',
+    'lead': 'Leads',
+    'followup': 'Follow-ups',
+    'all_leads': 'Leads (All)',
+    'own_leads': 'Leads (Own)',
+    'notification': 'Notifications',
+    'server_notifications': 'Server Notifications',
+    'domain_notifications': 'Domain Notifications',
+    'exbot_notifications': 'Exbot Notifications'
 };
 
 const ACTION_MAP: Record<string, string> = {
     'view': 'View (Read Only)',
     'add': 'Create (Add New)',
     'change': 'Edit (Modify)',
-    'delete': 'Delete (Remove)'
+    'delete': 'Delete (Remove)',
+    'view_all': 'View All Records',
+    'view_own': 'View Own Records'
 };
 
 const PARENT_CATEGORY_MAP: Record<string, string> = {
@@ -112,11 +124,21 @@ const PARENT_CATEGORY_MAP: Record<string, string> = {
     'projectstats': 'Analytics',
     'server_stats': 'Analytics',
     'domain_stats': 'Analytics',
+    'exbot_stats': 'Analytics',
     'reports': 'Reports',
     'user': 'Users',
     'attendance': 'Attendance',
     'companyprofile': 'Extech Profile',
-    'role': 'Role Management'
+    'role': 'Role Management',
+    'projectexbot': 'Exbots',
+    'lead': 'Leads',
+    'followup': 'Leads',
+    'all_leads': 'Leads',
+    'own_leads': 'Leads',
+    'notification': 'Notifications',
+    'server_notifications': 'Notifications',
+    'domain_notifications': 'Notifications',
+    'exbot_notifications': 'Notifications'
 };
 
 const CATEGORY_ICON_MAP: Record<string, any> = {
@@ -126,6 +148,7 @@ const CATEGORY_ICON_MAP: Record<string, any> = {
     'Employees': UserCheck,
     'Teams': Layers,
     'Projects': Briefcase,
+    'Notifications': Bell,
     'Servers': Server,
     'Domains': Globe,
     'Invoices': FileText,
@@ -140,6 +163,8 @@ const CATEGORY_ICON_MAP: Record<string, any> = {
     'Team Performance': BarChart3,
     'Extech Profile': Building2,
     'Role Management': UserCog,
+    'Exbots': MessageSquare,
+    'Leads': Target,
     'Other Modules': Settings
 };
 
@@ -164,6 +189,9 @@ const CATEGORY_ORDER = [
     'Team Performance',
     'Extech Profile',
     'Role Management',
+    'Exbots',
+    'Leads',
+    'Notifications',
     'Other Modules'
 ];
 
@@ -561,7 +589,11 @@ const RoleManagement: React.FC = () => {
                                                                             </div>
                                                                             <div className="flex flex-col items-start text-left">
                                                                                 <span className="text-[11px] font-bold text-foreground">
-                                                                                    {ACTION_MAP[perm.split('_')[0]] || perm.split('_')[0].charAt(0).toUpperCase() + perm.split('_')[0].slice(1)}
+                                                                                    {perm === 'view_all_leads' ? 'View All Leads' : 
+                                                                                     perm === 'view_own_leads' ? 'View Own Leads' :
+                                                                                     perm === 'view_all_employee_performance' ? 'View All Performance' :
+                                                                                     perm === 'view_own_employee_performance' ? 'View Own Performance' :
+                                                                                     ACTION_MAP[perm.split('_')[0]] || perm.split('_')[0].charAt(0).toUpperCase() + perm.split('_')[0].slice(1)}
                                                                                 </span>
                                                                                 <span className="text-[9px] font-medium text-slate-400 mt-0.5 break-all">Key: {perm}</span>
                                                                             </div>

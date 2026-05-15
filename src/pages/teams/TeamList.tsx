@@ -8,12 +8,11 @@ import {
     Edit2,
     Trash2,
     AlertCircle,
-    ChevronLeft,
-    ChevronRight,
     Users,
     UserCircle,
     Layers
 } from 'lucide-react';
+import Pagination from '../../components/Pagination';
 
 const TeamList: React.FC = () => {
     const [teams, setTeams] = useState<Team[]>([]);
@@ -122,6 +121,7 @@ const TeamList: React.FC = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-muted/5 border-b border-border">
+                                <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest w-20">#</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest">Team Group</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest">Team Lead</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest text-center">Members</th>
@@ -130,8 +130,13 @@ const TeamList: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
-                            {teams.map((team) => (
+                            {teams.map((team, index) => (
                                 <tr key={team.id} className="hover:bg-muted/5 transition-colors group">
+                                    <td className="px-8 py-6">
+                                        <div className="w-8 h-8 rounded-lg bg-muted/20 flex items-center justify-center text-[10px] font-black text-muted">
+                                            {String((currentPage - 1) * ITEMS_PER_PAGE + index + 1).padStart(2, '0')}
+                                        </div>
+                                    </td>
                                     <td className="px-8 py-6">
                                         <div className="flex items-center gap-4">
                                             <div className="p-3 rounded-xl bg-blue-500/10 text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-all">
@@ -177,28 +182,16 @@ const TeamList: React.FC = () => {
                 )}
 
                 {/* Pagination */}
-                {totalCount > ITEMS_PER_PAGE && (
-                    <div className="px-8 py-6 bg-muted/5 border-t border-border flex items-center justify-between">
-                        <p className="text-xs text-muted font-bold uppercase tracking-widest">Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} records</p>
-                        <div className="flex items-center gap-2">
-                            <button
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage(p => p - 1)}
-                                className="p-2 hover:bg-blue-500/10 text-blue-500 rounded-xl disabled:opacity-30 transition-all border border-border hover:border-blue-500/20"
-                            >
-                                <ChevronLeft size={20} />
-                            </button>
-                            <span className="px-4 py-2 bg-blue-500/5 text-blue-500 text-sm font-black rounded-xl border border-blue-500/20">{currentPage} / {totalPages}</span>
-                            <button
-                                disabled={currentPage === totalPages}
-                                onClick={() => setCurrentPage(p => p + 1)}
-                                className="p-2 hover:bg-blue-500/10 text-blue-500 rounded-xl disabled:opacity-30 transition-all border border-border hover:border-blue-500/20"
-                            >
-                                <ChevronRight size={20} />
-                            </button>
-                        </div>
-                    </div>
-                )}
+                <div className="px-6">
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalCount={totalCount}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                        itemName="teams"
+                    />
+                </div>
             </div>
         </div>
     );

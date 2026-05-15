@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAttendances, deleteAttendance, type Attendance } from './attendanceService';
 import { usePermission } from '../../hooks/usePermission';
-import { getUsers } from '../user/userService';
 import {
     Search, Plus, Loader2, Edit2, Trash2, AlertCircle,
-    ChevronLeft, ChevronRight, User, CalendarCheck, CheckCircle2, XCircle, Clock
+    User, CalendarCheck, CheckCircle2, XCircle, Clock
 } from 'lucide-react';
+import Pagination from '../../components/Pagination';
 
 const AttendanceList: React.FC = () => {
     const [records, setRecords] = useState<Attendance[]>([]);
@@ -15,7 +15,6 @@ const AttendanceList: React.FC = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
     const [error, setError] = useState<string | null>(null);
-    const [users, setUsers] = useState<any[]>([]);
     const navigate = useNavigate();
     const { hasPermission } = usePermission();
 
@@ -25,13 +24,9 @@ const AttendanceList: React.FC = () => {
     const fetchData = async (page = 1, search = '') => {
         setLoading(true); setError(null);
         try {
-            const [attData, userData] = await Promise.all([
-                getAttendances(page, search),
-                getUsers(1, '')
-            ]);
+            const attData = await getAttendances(page, search);
             setRecords(attData.results);
             setTotalCount(attData.count);
-            setUsers(userData.results || []);
         } catch (err: any) {
             setError(err.response?.data?.detail || 'Failed to load attendance records.');
         } finally { setLoading(false); }
@@ -48,10 +43,6 @@ const AttendanceList: React.FC = () => {
         catch (err: any) { alert(err.response?.data?.detail || 'Failed to delete.'); }
     };
 
-    const getUserName = (id: number) => {
-        const u = users.find(u => u.id === id);
-        return u ? `${u.first_name} ${u.last_name}`.trim() || u.username : `User #${id}`;
-    };
 
     const getStatusStyle = (status: string) => {
         switch (status?.toLowerCase()) {
@@ -136,6 +127,7 @@ const AttendanceList: React.FC = () => {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-muted/5 border-b border-border">
+                                <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest w-12 text-center">#</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest">Employee</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest">Date</th>
                                 <th className="px-8 py-5 text-[10px] font-black uppercase text-muted tracking-widest">Check In</th>
@@ -145,13 +137,18 @@ const AttendanceList: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
-                            {records.map(rec => (
+                            {records.map((rec, index) => (
                                 <tr key={rec.id} className="hover:bg-muted/5 transition-colors group">
+                                    <td className="px-8 py-6">
+                                        <div className="w-8 h-8 rounded-lg bg-muted/20 flex items-center justify-center text-[10px] font-black text-muted group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                                            {String((currentPage - 1) * ITEMS_PER_PAGE + index + 1).padStart(2, '0')}
+                                        </div>
+                                    </td>
                                     <td className="px-8 py-6">
                                         <div className="flex items-center gap-3">
                                             <div className="p-2.5 bg-primary/10 text-primary rounded-xl"><User size={18} /></div>
                                             <div>
-                                                <p className="text-sm font-black text-foreground">{getUserName(rec.employee)}</p>
+                                                <p className="text-sm font-black text-foreground">{rec.employee_name || `User #${rec.employee}`}</p>
                                                 <p className="text-[10px] text-muted font-bold uppercase mt-0.5">ID: {rec.employee}</p>
                                             </div>
                                         </div>
@@ -200,16 +197,17 @@ const AttendanceList: React.FC = () => {
                     </div>
                 )}
 
-                {totalCount > ITEMS_PER_PAGE && (
-                    <div className="px-8 py-6 bg-muted/5 border-t border-border flex items-center justify-between">
-                        <p className="text-xs text-muted font-bold uppercase tracking-widest">Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount}</p>
-                        <div className="flex items-center gap-2">
-                            <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 hover:bg-primary/10 text-primary rounded-xl disabled:opacity-30 border border-border hover:border-primary/20"><ChevronLeft size={20} /></button>
-                            <span className="px-4 py-2 bg-primary/5 text-primary text-sm font-black rounded-xl border border-primary/20">{currentPage} / {totalPages}</span>
-                            <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 hover:bg-primary/10 text-primary rounded-xl disabled:opacity-30 border border-border hover:border-primary/20"><ChevronRight size={20} /></button>
-                        </div>
-                    </div>
-                )}
+                {/* Pagination */}
+                <div className="px-4">
+                    <Pagination 
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalCount={totalCount}
+                        itemsPerPage={ITEMS_PER_PAGE}
+                        onPageChange={setCurrentPage}
+                        itemName="records"
+                    />
+                </div>
             </div>
         </div>
     );

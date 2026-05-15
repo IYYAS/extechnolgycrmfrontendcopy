@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getAttendance, createAttendance, updateAttendance } from './attendanceService';
-import { getUsers } from '../user/userService';
 import { ArrowLeft, Save, Loader2, User, Calendar, Clock, AlertCircle } from 'lucide-react';
+import SearchableUserSelect from '../../components/SearchableUserSelect';
 
 const STATUS_OPTIONS = ['Present', 'Absent', 'Half Day', 'Late'];
 
@@ -18,7 +18,6 @@ const AttendanceForm: React.FC = () => {
     const [loading, setLoading] = useState(isEdit);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [users, setUsers] = useState<any[]>([]);
 
     const [formData, setFormData] = useState<any>({
         date: new Date().toISOString().split('T')[0],
@@ -31,8 +30,6 @@ const AttendanceForm: React.FC = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const userData = await getUsers(1, '');
-                setUsers(userData.results || []);
                 if (isEdit && id) {
                     const rec = await getAttendance(parseInt(id));
                     setFormData({ ...rec, employee: rec.employee.toString(), check_in: rec.check_in || '', check_out: rec.check_out || '' });
@@ -100,17 +97,10 @@ const AttendanceForm: React.FC = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className={labelCls}>Employee</label>
-                            <select value={formData.employee} onChange={e => setFormData({ ...formData, employee: e.target.value })} className={inputCls} required>
-                                <option value="">Select Employee...</option>
-                                {users.map(u => {
-                                    const fullName = `${u.first_name || ''} ${u.last_name || ''}`.trim();
-                                    return (
-                                        <option key={u.id} value={u.id}>
-                                            {fullName ? `${fullName} (${u.username})` : u.username}
-                                        </option>
-                                    );
-                                })}
-                            </select>
+                            <SearchableUserSelect
+                                value={formData.employee}
+                                onChange={(val) => setFormData({ ...formData, employee: val })}
+                            />
                         </div>
                         <div>
                             <label className={labelCls}>Date</label>

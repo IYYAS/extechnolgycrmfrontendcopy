@@ -17,10 +17,15 @@ import {
     Trash2,
     Receipt,
     CreditCard,
-    ArrowUpRight,
     Download,
-    ArrowLeft
+    ArrowLeft,
+    Filter,
+    X,
+    ChevronDown,
+    ChevronUp
 } from 'lucide-react';
+import Pagination from '../../components/Pagination';
+import CustomSelect from '../../components/CustomSelect';
 
 const InvoiceList: React.FC = () => {
     const { hasPermission } = usePermission();
@@ -29,8 +34,17 @@ const InvoiceList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
+    const [statistics, setStatistics] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [showFilters, setShowFilters] = useState(false);
+    const [filters, setFilters] = useState({
+        status: '',
+        min_amount: '',
+        max_amount: '',
+        start_date: '',
+        end_date: ''
+    });
     const { clientId: clientIdParam } = useParams<{ clientId: string }>();
     const clientId = clientIdParam ? parseInt(clientIdParam) : undefined;
     const navigate = useNavigate();
@@ -38,14 +52,15 @@ const InvoiceList: React.FC = () => {
     const ITEMS_PER_PAGE = 10;
     const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-    const fetchInvoices = async (page: number = 1, search: string = '') => {
+    const fetchInvoices = async (page: number = 1, search: string = '', currentFilters = filters) => {
         setLoading(true);
         setError(null);
         try {
             if (!clientId) throw new Error('Client ID is required');
-            const data = await getInvoices(clientId, page, search);
+            const data = await getInvoices(clientId, page, search, currentFilters);
             setInvoices(data.results);
             setTotalCount(data.count);
+            setStatistics(data.statistics);
         } catch (error: any) {
             console.error('Failed to fetch invoices:', error);
             setError(error.response?.data?.detail || 'Failed to load invoices. Please try again.');
@@ -109,8 +124,8 @@ const InvoiceList: React.FC = () => {
     }, [clientId]);
 
     useEffect(() => {
-        fetchInvoices(currentPage, searchTerm);
-    }, [currentPage]);
+        fetchInvoices(currentPage, searchTerm, filters);
+    }, [currentPage, filters]);
 
     const getStatusStyles = (status: string) => {
         switch (status?.toUpperCase()) {
@@ -182,31 +197,42 @@ const InvoiceList: React.FC = () => {
                 </div>
             </div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-card border border-border rounded-2xl shadow-sm">
-                    <p className="text-muted text-xs font-semibold uppercase tracking-wider">Total Invoices</p>
-                    <div className="flex items-end justify-between mt-1">
-                        <p className="text-2xl font-bold text-foreground">{totalCount}</p>
-                        <Receipt className="text-primary/20" size={24} />
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-top-4 duration-500 delay-150">
+                <div className="bg-card border border-border p-6 rounded-[2rem] shadow-sm flex items-center gap-5 hover:border-primary/30 transition-colors">
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                        <FileText size={28} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-muted uppercase tracking-widest mb-0.5">Total Invoices</p>
+                        <h3 className="text-2xl font-black text-foreground">{statistics?.total || 0}</h3>
                     </div>
                 </div>
-                <div className="p-4 bg-card border border-border rounded-2xl shadow-sm">
-                    <p className="text-muted text-xs font-semibold uppercase tracking-wider">Total Revenue</p>
-                    <div className="flex items-end justify-between mt-1">
-                        <p className="text-2xl font-bold text-emerald-500">
-                            {formatCurrency(invoices.reduce((acc, inv) => acc + Number(inv.total_amount), 0))}
-                        </p>
-                        <CreditCard className="text-emerald-500/20" size={24} />
+                <div className="bg-card border border-border p-6 rounded-[2rem] shadow-sm flex items-center gap-5 hover:border-emerald-500/30 transition-colors">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                        <CreditCard size={28} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-0.5">Paid</p>
+                        <h3 className="text-2xl font-black text-foreground">{statistics?.paid || 0}</h3>
                     </div>
                 </div>
-                <div className="p-4 bg-card border border-border rounded-2xl shadow-sm">
-                    <p className="text-muted text-xs font-semibold uppercase tracking-wider">Outstanding</p>
-                    <div className="flex items-end justify-between mt-1">
-                        <p className="text-2xl font-bold text-rose-500">
-                            {formatCurrency(invoices.reduce((acc, inv) => acc + Number(inv.balance_due), 0))}
-                        </p>
-                        <ArrowUpRight className="text-rose-500/20" size={24} />
+                <div className="bg-card border border-border p-6 rounded-[2rem] shadow-sm flex items-center gap-5 hover:border-amber-500/30 transition-colors">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                        <Receipt size={28} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-0.5">Partial</p>
+                        <h3 className="text-2xl font-black text-foreground">{statistics?.partial || 0}</h3>
+                    </div>
+                </div>
+                <div className="bg-card border border-border p-6 rounded-[2rem] shadow-sm flex items-center gap-5 hover:border-rose-500/30 transition-colors">
+                    <div className="w-14 h-14 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                        <CreditCard size={28} />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-0.5">Unpaid</p>
+                        <h3 className="text-2xl font-black text-foreground">{statistics?.unpaid || 0}</h3>
                     </div>
                 </div>
             </div>
@@ -218,13 +244,107 @@ const InvoiceList: React.FC = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={18} />
                         <input
                             type="text"
-                            placeholder="Search invoices..."
+                            placeholder="Search invoices by number..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-xl text-foreground placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
                         />
                     </div>
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <button
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all font-semibold ${
+                                showFilters 
+                                    ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20' 
+                                    : 'bg-background text-foreground border-border hover:border-primary/50'
+                            }`}
+                        >
+                            <Filter size={18} />
+                            <span>Filters</span>
+                            {showFilters ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
+                        {(filters.status || filters.min_amount || filters.max_amount || filters.start_date || filters.end_date) && (
+                            <button
+                                onClick={() => setFilters({
+                                    status: '',
+                                    min_amount: '',
+                                    max_amount: '',
+                                    start_date: '',
+                                    end_date: ''
+                                })}
+                                className="p-2.5 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all border border-transparent hover:border-rose-500/20"
+                                title="Clear all filters"
+                            >
+                                <X size={20} />
+                            </button>
+                        )}
+                    </div>
                 </div>
+
+                {showFilters && (
+                    <div className="p-4 border-t border-border bg-muted/5 animate-in slide-in-from-top-4 duration-300">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* Status Filter */}
+                            <CustomSelect
+                                label="Payment Status"
+                                value={filters.status}
+                                onChange={(val) => setFilters({ ...filters, status: val })}
+                                options={[
+                                    { label: 'All Statuses', value: '' },
+                                    { label: 'Paid', value: 'PAID' },
+                                    { label: 'Partial', value: 'PARTIAL' },
+                                    { label: 'Unpaid', value: 'UNPAID' },
+                                ]}
+                            />
+
+                            {/* Amount Range */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-1">Total Amount (Min - Max)</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="number"
+                                        placeholder="Min"
+                                        value={filters.min_amount}
+                                        onChange={(e) => setFilters({ ...filters, min_amount: e.target.value })}
+                                        className="w-full px-3 py-2 bg-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                    <input
+                                        type="number"
+                                        placeholder="Max"
+                                        value={filters.max_amount}
+                                        onChange={(e) => setFilters({ ...filters, max_amount: e.target.value })}
+                                        className="w-full px-3 py-2 bg-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Invoice Date Range */}
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-muted ml-1">Invoice Date Range</label>
+                                <div className="flex gap-4">
+                                    <div className="relative flex-1">
+                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+                                        <input
+                                            type="date"
+                                            value={filters.start_date}
+                                            onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
+                                            className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        />
+                                    </div>
+                                    <div className="relative flex-1">
+                                        <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={14} />
+                                        <input
+                                            type="date"
+                                            value={filters.end_date}
+                                            onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
+                                            className="w-full pl-10 pr-4 py-2 bg-background border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="px-6 py-24 text-center">
@@ -250,16 +370,24 @@ const InvoiceList: React.FC = () => {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-muted/5 text-muted text-xs font-semibold uppercase tracking-wider">
+                                        <th className="px-6 py-4 w-12 text-center">#</th>
                                         <th className="px-6 py-4">Invoice Info</th>
-                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-center">Service</th>
+                                        <th className="px-6 py-4 text-center">Status</th>
+                                        <th className="px-6 py-4 text-center">Created At</th>
                                         <th className="px-6 py-4">Amount</th>
                                         <th className="px-6 py-4">Due Date</th>
                                         <th className="px-6 py-4 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {invoices.map((invoice) => (
+                                    {invoices.map((invoice, index) => (
                                         <tr key={invoice.id} className="group hover:bg-muted/5 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="w-8 h-8 rounded-lg bg-muted/20 flex items-center justify-center text-[10px] font-black text-muted group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                                                    {String((currentPage - 1) * ITEMS_PER_PAGE + index + 1).padStart(2, '0')}
+                                                </div>
+                                            </td>
                                             <td className="px-6 py-4 cursor-pointer" onClick={() => navigate(`/invoices/client/${clientId}/${invoice.id}`)}>
                                                 <div className="flex items-center space-x-3">
                                                     <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary border border-primary/10">
@@ -267,15 +395,31 @@ const InvoiceList: React.FC = () => {
                                                     </div>
                                                     <div>
                                                         <p className="text-foreground font-bold">{invoice.invoice_number || `INV-${invoice.id.toString().padStart(4, '0')}`}</p>
-                                                        <p className="text-muted text-xs">{formatDate(invoice.invoice_date)}</p>
                                                     </div>
                                                 </div>
                                             </td>
 
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 text-center">
+                                                {invoice.items?.[0]?.service_type ? (
+                                                    <span className="inline-block px-2.5 py-1 rounded-lg bg-primary/10 text-primary border border-primary/15 text-[10px] font-black uppercase tracking-wide">
+                                                        {invoice.items[0].service_type}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-muted text-xs">—</span>
+                                                )}
+                                            </td>
+
+                                            <td className="px-6 py-4 text-center">
                                                 <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${getStatusStyles(invoice.status)}`}>
                                                     {invoice.status}
                                                 </span>
+                                            </td>
+
+                                            <td className="px-6 py-4 text-center">
+                                                <div className="flex items-center justify-center space-x-2 text-xs font-bold text-muted uppercase tracking-tight">
+                                                    <Calendar size={14} className="text-primary/40" />
+                                                    <span>{formatDate(invoice.created_at || invoice.invoice_date)}</span>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <p className="text-foreground font-bold">{formatCurrency(invoice.total_amount)}</p>
@@ -326,6 +470,11 @@ const InvoiceList: React.FC = () => {
                                             <h3 className="text-foreground font-bold text-lg group-hover:text-primary transition-colors">
                                                 {invoice.invoice_number || `INV-${invoice.id.toString().padStart(4, '0')}`}
                                             </h3>
+                                            {invoice.items?.[0]?.service_type && (
+                                                <span className="inline-block mt-1 px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/15 text-[10px] font-black uppercase tracking-wide">
+                                                    {invoice.items[0].service_type}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 mb-6 pt-4 border-t border-border/50">
@@ -367,13 +516,14 @@ const InvoiceList: React.FC = () => {
             </div>
 
             {/* Pagination */}
-            {!loading && totalCount > 0 && totalPages > 1 && (
-                <div className="flex items-center justify-center space-x-2 py-4">
-                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg border border-border disabled:opacity-30">Prev</button>
-                    <span className="text-sm font-bold">Page {currentPage} of {totalPages}</span>
-                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg border border-border disabled:opacity-30">Next</button>
-                </div>
-            )}
+            <Pagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalCount={totalCount}
+                itemsPerPage={ITEMS_PER_PAGE}
+                onPageChange={setCurrentPage}
+                itemName="invoices"
+            />
         </div>
     );
 };

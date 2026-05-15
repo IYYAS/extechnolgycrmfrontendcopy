@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getTeam, createTeam, updateTeam, type Team } from './teamService';
 import { getUsers, type User } from '../user/userService';
@@ -7,12 +7,14 @@ import {
     Save,
     ArrowLeft,
     Users,
-    UserCircle,
-    Search,
-    Check,
+    BadgeCheck,
+    ChevronDown,
     AlertCircle,
-    BadgeCheck
+    Search,
+    Check
 } from 'lucide-react';
+import { api } from '../../api/api';
+import SearchableUserSelect from '../../components/SearchableUserSelect';
 
 const TeamForm: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -29,34 +31,143 @@ const TeamForm: React.FC = () => {
         members: []
     });
 
-    const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [users, setUsers] = useState<User[]>([]);
+    const [preloadedUsers, setPreloadedUsers] = useState<User[]>([]);
     const [userSearch, setUserSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    
+    const pageRef = useRef(1);
+    const loadingRef = useRef(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    // Debounce search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(userSearch);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [userSearch]);
+
+    const loadUsers = async (pageNum: number, searchStr: string, reset: boolean) => {
+        if (loadingRef.current && !reset) return;
+        loadingRef.current = true;
+        if (!reset) setLoadingMore(true);
+
+        try {
+            const response = await getUsers(pageNum, searchStr);
+            const newUsers = response.results || [];
+            
+            setUsers(prev => {
+                let combined;
+                if (reset) {
+                    combined = [...preloadedUsers, ...newUsers];
+                    pageRef.current = 1;
+                } else {
+                    combined = [...prev, ...newUsers];
+                    pageRef.current = pageNum;
+                }
+                
+                // Remove duplicates by ID
+                const seen = new Set();
+                return combined.filter(u => {
+                    if (u.id && !seen.has(u.id)) {
+                        seen.add(u.id);
+                        return true;
+                    }
+                    return false;
+                });
+            });
+            
+            setHasMore(!!response.next);
+
+            // AUTO-FILL CHECK: If the container isn't full yet, and we have more, load next page
+            setTimeout(() => {
+                if (scrollContainerRef.current) {
+                    const { scrollHeight, clientHeight } = scrollContainerRef.current;
+                    if (scrollHeight <= clientHeight + 10 && !!response.next && !loadingRef.current) {
+                        loadUsers(pageNum + 1, searchStr, false);
+                    }
+                }
+            }, 100);
+
+        } catch (err) {
+            console.error('Failed to load users:', err);
+        } finally {
+            loadingRef.current = false;
+            setLoadingMore(false);
+        }
+    };
+
+    // Load on mount and on search
+    useEffect(() => {
+        loadUsers(1, debouncedSearch, true);
+    }, [debouncedSearch]);
 
     useEffect(() => {
-        const loadInitialData = async () => {
-            try {
-                // Load all users for selection
-                const usersResponse = await getUsers(1, '');
-                setAllUsers(usersResponse.results || []);
-
-                if (isEdit) {
-                    const teamData = await getTeam(parseInt(id));
+        const loadInitialTeam = async () => {
+            if (isEdit) {
+                try {
+                    const teamData = await getTeam(parseInt(id!));
                     setFormData({
                         name: teamData.name,
                         team_lead: teamData.team_lead,
                         members: teamData.members || []
                     });
+
+                    // Fetch details of selected members and lead to ensure they are in the list
+                    const memberIds = teamData.members || [];
+                    const leadId = teamData.team_lead;
+                    const allTargetIds = Array.from(new Set([...memberIds, ...(leadId ? [leadId] : [])]));
+                    
+                    if (allTargetIds.length > 0) {
+                        const detailPromises = allTargetIds.map(uid => api.get<User>(`/users/${uid}/`).then((r: any) => r.data).catch(() => null));
+                        const details = (await Promise.all(detailPromises)).filter(Boolean) as User[];
+                        setPreloadedUsers(details);
+                        setUsers(prev => {
+                            const combined = [...details, ...prev];
+                            const seen = new Set();
+                            return combined.filter(u => {
+                                if (u.id && !seen.has(u.id)) {
+                                    seen.add(u.id);
+                                    return true;
+                                }
+                                return false;
+                            });
+                        });
+                    }
+
+                } catch (err: any) {
+                    console.error('Failed to load team:', err);
+                    setError('Failed to load team data.');
+                } finally {
+                    setLoading(false);
                 }
-            } catch (err: any) {
-                console.error('Failed to load data:', err);
-                setError('Failed to load form data.');
-            } finally {
+            } else {
                 setLoading(false);
             }
         };
 
-        loadInitialData();
+        loadInitialTeam();
     }, [id, isEdit]);
+
+    // Keep users synced with preloaded ones if we reset
+    useEffect(() => {
+        if (debouncedSearch === '') {
+            setUsers(prev => {
+                const combined = [...preloadedUsers, ...prev];
+                const seen = new Set();
+                return combined.filter(u => {
+                    if (u.id && !seen.has(u.id)) {
+                        seen.add(u.id);
+                        return true;
+                    }
+                    return false;
+                });
+            });
+        }
+    }, [preloadedUsers, debouncedSearch]);
 
     const handleMemberToggle = (userId: number) => {
         setFormData(prev => {
@@ -93,10 +204,12 @@ const TeamForm: React.FC = () => {
         }
     };
 
-    const filteredUsers = allUsers.filter(u => 
-        u.username?.toLowerCase().includes(userSearch.toLowerCase()) ||
-        (`${u.first_name || ''} ${u.last_name || ''}`).toLowerCase().includes(userSearch.toLowerCase())
-    );
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+        if (scrollHeight - scrollTop <= clientHeight + 50 && hasMore && !loadingRef.current) {
+            loadUsers(pageRef.current + 1, debouncedSearch, false);
+        }
+    };
 
     if (loading) return (
         <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -162,18 +275,12 @@ const TeamForm: React.FC = () => {
                             </div>
                             <div>
                                 <label className="text-[10px] font-black uppercase text-muted tracking-widest mb-1.5 block">Team Lead</label>
-                                <select
-                                    value={formData.team_lead || ''}
-                                    onChange={e => setFormData({ ...formData, team_lead: e.target.value ? parseInt(e.target.value) : null })}
-                                    className="w-full bg-muted/20 border border-border rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-primary/20 transition-all outline-none appearance-none"
-                                >
-                                    <option value="">Select Command Lead...</option>
-                                    {allUsers.map(u => (
-                                        <option key={u.id} value={u.id}>
-                                            {u.first_name || u.last_name ? `${u.first_name} ${u.last_name} (@${u.username})` : u.username}
-                                        </option>
-                                    ))}
-                                </select>
+                                <SearchableUserSelect
+                                    value={formData.team_lead ?? null}
+                                    onChange={val => setFormData({ ...formData, team_lead: val })}
+                                    placeholder="Select Command Lead..."
+                                    className="w-full"
+                                />
                             </div>
                         </div>
                     </div>
@@ -223,8 +330,12 @@ const TeamForm: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-3 content-start">
-                            {filteredUsers.map((user) => {
+                        <div 
+                            ref={scrollContainerRef}
+                            onScroll={handleScroll}
+                            className="flex-1 overflow-y-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-3 content-start custom-scrollbar max-h-[500px]"
+                        >
+                            {users.map((user) => {
                                 const isSelected = formData.members?.includes(user.id);
                                 return (
                                     <button
@@ -237,20 +348,32 @@ const TeamForm: React.FC = () => {
                                                 : 'bg-muted/5 border-border hover:border-blue-500/20 hover:bg-muted/10'
                                             }`}
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-xl transition-all
-                                                ${isSelected ? 'bg-blue-500 text-white' : 'bg-muted/20 text-muted group-hover:bg-blue-500/20 group-hover:text-blue-500'}
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-xs transition-all flex-shrink-0
+                                                ${isSelected ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'bg-muted/20 text-muted group-hover:bg-blue-500/20 group-hover:text-blue-500'}
                                             `}>
-                                                <UserCircle size={18} />
+                                                {user.profile_pic ? (
+                                                    <img src={user.profile_pic} alt="" className="w-full h-full rounded-full object-cover" />
+                                                ) : (
+                                                    (user.first_name?.[0] || user.username?.[0] || 'U').toUpperCase()
+                                                )}
                                             </div>
-                                            <div>
-                                                <p className="text-sm font-black text-foreground">
+                                            <div className="min-w-0">
+                                                <p className={`text-sm font-bold truncate ${isSelected ? 'text-blue-500' : 'text-foreground'}`}>
                                                     {user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
                                                 </p>
-                                                <p className="text-[10px] font-bold text-muted uppercase tracking-tight">@{user.username}</p>
+                                                <div className="flex items-center gap-1.5 truncate">
+                                                    <p className="text-[10px] text-muted truncate">@{user.username}</p>
+                                                    {user.designation && (
+                                                        <>
+                                                            <span className="w-0.5 h-0.5 rounded-full bg-muted/30" />
+                                                            <p className="text-[9px] font-black text-blue-500/60 uppercase truncate">{user.designation}</p>
+                                                        </>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all border
+                                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all border flex-shrink-0
                                             ${isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-border text-transparent'}
                                         `}>
                                             <Check size={14} />
@@ -259,7 +382,20 @@ const TeamForm: React.FC = () => {
                                 );
                             })}
                             
-                            {filteredUsers.length === 0 && (
+                            {hasMore && !loadingMore && users.length > 0 && (
+                                <div className="col-span-full py-6 flex flex-col items-center gap-2 opacity-40 group-hover:opacity-100 transition-opacity">
+                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] italic">Scroll for more</p>
+                                    <ChevronDown size={14} className="animate-bounce" />
+                                </div>
+                            )}
+
+                            {loadingMore && (
+                                <div className="col-span-full py-4 flex justify-center">
+                                    <Loader2 className="animate-spin text-blue-500" size={24} />
+                                </div>
+                            )}
+
+                            {users.length === 0 && !loadingRef.current && (
                                 <div className="col-span-full py-20 text-center opacity-50">
                                     <Search size={32} className="mx-auto mb-2 text-muted" />
                                     <p className="text-sm font-bold">No commanders match your search</p>

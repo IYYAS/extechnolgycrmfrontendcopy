@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getUserSalary, createUserSalary, updateUserSalary } from './userSalaryService';
-import { getUsers } from '../user/userService';
+import SearchableUserSelect from '../../components/SearchableUserSelect';
 import {
     ArrowLeft, Save, Loader2, User, DollarSign, AlertCircle, Calendar, Briefcase
 } from 'lucide-react';
@@ -14,7 +14,6 @@ const UserSalaryForm: React.FC = () => {
     const [loading, setLoading] = useState(isEdit);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [users, setUsers] = useState<any[]>([]);
 
     const [formData, setFormData] = useState<any>({
         user: '',
@@ -26,8 +25,6 @@ const UserSalaryForm: React.FC = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const userData = await getUsers(1, '');
-                setUsers(userData.results || []);
                 if (isEdit && id) {
                     const item = await getUserSalary(parseInt(id));
                     setFormData({
@@ -104,12 +101,10 @@ const UserSalaryForm: React.FC = () => {
                     </div>
                     <div>
                         <label className={labelCls}>Select Employee</label>
-                        <select value={formData.user} onChange={e => setFormData({ ...formData, user: e.target.value })} className={inputCls} required>
-                            <option value="">Select Employee...</option>
-                            {users.map(u => (
-                                <option key={u.id} value={u.id}>{u.username}</option>
-                            ))}
-                        </select>
+                        <SearchableUserSelect
+                            value={formData.user}
+                            onChange={(val) => setFormData({ ...formData, user: val?.toString() || '' })}
+                        />
                     </div>
                     <div>
                         <label className={labelCls}>Joining Date</label>

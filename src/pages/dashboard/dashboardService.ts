@@ -50,7 +50,7 @@ export interface AnalyticalService {
     is_overdue?: boolean;
     paid_status?: string;
     teams?: AnalyticalServiceTeam[];
-    
+
     // New granular dates
     service_team_start_date?: string | null;
     service_team_end_date?: string | null;
@@ -90,15 +90,26 @@ export interface ProjectFinance {
     balance_due: number;
 }
 
+export interface ProjectFinanceRecord {
+    id: number;
+    project_cost: number;
+    invoice_status: string;
+    payment_status: string;
+}
+
 export interface AnalyticalProject {
     project_id?: number;
     project_name: string;
+    project_finances?: ProjectFinanceRecord[];
     project_team_name: string;
     project_team_status?: string;
     project_status?: string;
     status: string;
     paid_status: string;
     serviceteam_count: number;
+    finance_count?: number;
+
+    paid_finance_count?: number;
     server_count?: number;
     paid_server_count?: number;
     unpaid_server_count?: number;
@@ -116,14 +127,14 @@ export interface AnalyticalProject {
     exbot_expiring_soon_count?: number;
     services: AnalyticalService[];
     start_date?: string;
-    
+
     // New granular payments
     project_payment?: string;
     domain_payment?: string;
     server_payment?: string;
     exbot_payment?: string;
     service_payment?: string;
-    
+
     // New team dates & counts
     project_teams_count?: number;
     service_teams_count?: number;
@@ -131,7 +142,7 @@ export interface AnalyticalProject {
     project_team_end_date?: string | null;
     project_team_deadline?: string | null;
     project_team_actual_date?: string | null;
-    
+
     total_paid?: number;
     balance_due?: number;
     total_project_cost?: number;
@@ -147,6 +158,7 @@ export interface AnalyticalProject {
         project_unpaid_cost?: number;
 
         domain: string;
+        domain_invoice_status?: string | null;
         domain_total_cost?: number;
         domain_paid_cost?: number;
         domain_unpaid_cost?: number;
@@ -159,6 +171,7 @@ export interface AnalyticalProject {
         }>;
 
         server: string;
+        server_invoice_status?: string | null;
         server_total_cost?: number;
         server_paid_cost?: number;
         server_unpaid_cost?: number;
@@ -187,10 +200,10 @@ export interface AnalyticalProject {
             deadline: string;
         }>;
     };
-    
+
     completed_teams_count?: number;
     total_teams_count?: number;
-    
+
     // Legacy support (optional)
     project?: ProjectInfo;
     progress?: ProjectProgress;
@@ -337,7 +350,7 @@ const buildQueryString = (filter: AnalyticalFilter): string => {
     if (filter.payment_status) params.append('payment_status', filter.payment_status);
     if (filter.team_status) params.append('team_status', filter.team_status);
     if (filter.date_field) params.append('date_field', filter.date_field);
-    
+
     const qs = params.toString();
     return qs ? `?${qs}` : '';
 };

@@ -29,11 +29,8 @@ export interface ProjectExecution {
 export interface ProjectFinance {
     id?: number;
     project_cost: string;
-    manpower_cost: string;
-    total_invoiced: string;
-    total_paid: string;
-    total_balance_due: string;
     invoice_status?: string;
+    payment_status?: string;
 }
 
 export interface Provider {

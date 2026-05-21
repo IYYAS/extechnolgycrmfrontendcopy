@@ -205,12 +205,11 @@ const ProjectDetail: React.FC = () => {
             <CollapsibleSection title="Financial Overview" icon={<DollarSign size={20} />} iconColor="text-emerald-500" bgColor="bg-emerald-500/10" fullWidth>
                 <div className="space-y-6">
                     {project.project_finances?.map((fin, idx) => (
-                        <div key={idx} className={`grid grid-cols-2 md:grid-cols-5 gap-4 ${idx > 0 ? 'pt-6 border-t border-border/50' : ''}`}>
+                        <div key={idx} className={`grid grid-cols-2 md:grid-cols-6 gap-4 ${idx > 0 ? 'pt-6 border-t border-border/50' : ''}`}>
                             <div className="md:col-span-1 flex flex-col justify-center">
                                 <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Ph #{idx + 1}</span>
                             </div>
                             <div><p className="text-[10px] uppercase font-bold text-muted tracking-wider">Total Budget</p><p className="text-lg font-black text-foreground">₹{fin.project_cost || '0.00'}</p></div>
-                            <div><p className="text-[10px] uppercase font-bold text-muted tracking-wider">Manpower</p><p className="text-lg font-black text-primary">₹{fin.manpower_cost || '0.00'}</p></div>
                             <div className="flex flex-col justify-center gap-2">
                                 <p className="text-[10px] uppercase font-bold text-muted tracking-widest">Billing</p>
                                 <div className="flex items-center gap-2">
@@ -233,6 +232,20 @@ const ProjectDetail: React.FC = () => {
                                                 <Receipt size={14} />
                                             </button>
                                         </>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex flex-col justify-center gap-2">
+                                <p className="text-[10px] uppercase font-bold text-muted tracking-widest">Payment</p>
+                                <div className="flex items-center gap-2">
+                                    {fin.payment_status === 'PAID' ? (
+                                        <div className="flex items-center gap-1.5 text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                                            <span className="text-[10px] font-black uppercase tracking-wider">✓ Paid</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5 text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                                            <span className="text-[10px] font-black uppercase tracking-wider">Unpaid</span>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -436,19 +449,26 @@ const ProjectDetail: React.FC = () => {
                                     <div><p className="text-[10px] uppercase font-bold text-muted tracking-widest">Expiration</p><p className="text-sm font-bold text-foreground mt-0.5">{server.expiration_date || '—'}</p></div>
                                     <div><p className="text-[10px] uppercase font-bold text-muted tracking-widest">Status</p><p className={`text-sm font-black mt-0.5 ${server.status === 'Active' ? 'text-emerald-500' : 'text-rose-500'}`}>{server.status}</p></div>
                                     <div className="flex flex-col gap-1">
-                                        <p className="text-[10px] uppercase font-bold text-emerald-500 tracking-widest">Payment</p>
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-sm font-black text-emerald-500">{server.payment_status || 'UNPAID'}</p>
-                                            {server.accrued_by === 'Extechnology' && (
-                                                <button
-                                                    onClick={() => handleBillItem('server', server.name || 'Server', server.cost || 0, server.purchase_date, server.expiration_date, server.id)}
-                                                    className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
-                                                    title="Generate Invoice"
-                                                >
-                                                    <Receipt size={14} />
-                                                </button>
-                                            )}
-                                        </div>
+                                        {server.accrued_by === 'Extechnology' ? (
+                                            <>
+                                                <p className="text-[10px] uppercase font-bold text-emerald-500 tracking-widest">Payment</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-black text-emerald-500">{server.payment_status || 'UNPAID'}</p>
+                                                    <button
+                                                        onClick={() => handleBillItem('server', server.name || 'Server', server.cost || 0, server.purchase_date, server.expiration_date, server.id)}
+                                                        className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
+                                                        title="Generate Invoice"
+                                                    >
+                                                        <Receipt size={14} />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-[10px] uppercase font-bold text-sky-500 tracking-widest">Accrued By</p>
+                                                <p className="text-sm font-black text-sky-500">{server.accrued_by}</p>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                                 {server.provider && server.provider.length > 0 && (
@@ -481,19 +501,26 @@ const ProjectDetail: React.FC = () => {
                                     <div><p className="text-[10px] uppercase font-bold text-muted tracking-widest">Purchase Date</p><p className="text-sm font-bold text-foreground mt-0.5">{domain.purchase_date || '—'}</p></div>
                                     <div><p className="text-[10px] uppercase font-bold text-muted tracking-widest">Expiration</p><p className="text-sm font-bold text-foreground mt-0.5">{domain.expiration_date || '—'}</p></div>
                                     <div className="flex flex-col gap-1">
-                                        <p className="text-[10px] uppercase font-bold text-emerald-500 tracking-widest">Payment</p>
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-sm font-black text-emerald-500">{domain.payment_status || 'UNPAID'}</p>
-                                            {domain.accrued_by === 'Extechnology' && (
-                                                <button
-                                                    onClick={() => handleBillItem('domain', domain.name || 'Domain', domain.cost || 0, domain.purchase_date, domain.expiration_date, domain.id)}
-                                                    className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
-                                                    title="Generate Invoice"
-                                                >
-                                                    <Receipt size={14} />
-                                                </button>
-                                            )}
-                                        </div>
+                                        {domain.accrued_by === 'Extechnology' ? (
+                                            <>
+                                                <p className="text-[10px] uppercase font-bold text-emerald-500 tracking-widest">Payment</p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-black text-emerald-500">{domain.payment_status || 'UNPAID'}</p>
+                                                    <button
+                                                        onClick={() => handleBillItem('domain', domain.name || 'Domain', domain.cost || 0, domain.purchase_date, domain.expiration_date, domain.id)}
+                                                        className="p-1.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 rounded-lg transition-all border border-emerald-500/20"
+                                                        title="Generate Invoice"
+                                                    >
+                                                        <Receipt size={14} />
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p className="text-[10px] uppercase font-bold text-sky-500 tracking-widest">Accrued By</p>
+                                                <p className="text-sm font-black text-sky-500">{domain.accrued_by}</p>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                                 {domain.provider && domain.provider.length > 0 && (

@@ -623,18 +623,41 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                 <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[60px] mb-1" title={p.server_name}>
                                                                                     {p.server_name || 'N/A'}
                                                                                 </span>
-                                                                                <div className={`p-1 w-6 h-6 rounded flex items-center justify-center mx-auto ${p.category_status?.server === 'Paid' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-400'}`} title="Server">
-                                                                                    <Server size={12} />
-                                                                                </div>
-                                                                                {(p.server_count ?? 0) > 0 && (
-                                                                                    <span className="text-[10px] font-black block mt-1">
-                                                                                        <span className={p.paid_server_count === p.server_count ? "text-emerald-500" : "text-slate-500"}>
-                                                                                            {p.paid_server_count || 0}
-                                                                                        </span>
-                                                                                        <span className="text-slate-400 font-medium mx-0.5">/</span>
-                                                                                        <span className="text-slate-500">{p.server_count}</span>
-                                                                                    </span>
-                                                                                )}
+                                                                                {(() => {
+                                                                                    const serverItems = (p.category_status as any)?.server_items || [];
+                                                                                    const hasClientAccrued = serverItems.some((s: any) => s.accrued_by && s.accrued_by !== 'Extechnology');
+                                                                                    const allClientAccrued = serverItems.length > 0 && serverItems.every((s: any) => s.accrued_by && s.accrued_by !== 'Extechnology');
+
+                                                                                    if (allClientAccrued) {
+                                                                                        const label = serverItems[0]?.accrued_by === 'Client' ? 'Client' : '3rd Party';
+                                                                                        return (
+                                                                                            <>
+                                                                                                <div className="p-1 w-6 h-6 rounded flex items-center justify-center mx-auto bg-sky-500/10 text-sky-500" title={`${label} Accrued`}>
+                                                                                                    <Server size={12} />
+                                                                                                </div>
+                                                                                                <span className="text-[8px] font-black text-sky-500 mt-1 uppercase">{label}</span>
+                                                                                            </>
+                                                                                        );
+                                                                                    }
+
+                                                                                    return (
+                                                                                        <>
+                                                                                            <div className={`p-1 w-6 h-6 rounded flex items-center justify-center mx-auto ${p.category_status?.server === 'Paid' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-400'}`} title="Server">
+                                                                                                <Server size={12} />
+                                                                                            </div>
+                                                                                            {(p.server_count ?? 0) > 0 && (
+                                                                                                <span className="text-[10px] font-black block mt-1">
+                                                                                                    <span className={p.paid_server_count === p.server_count ? "text-emerald-500" : "text-slate-500"}>
+                                                                                                        {p.paid_server_count || 0}
+                                                                                                    </span>
+                                                                                                    <span className="text-slate-400 font-medium mx-0.5">/</span>
+                                                                                                    <span className="text-slate-500">{p.server_count}</span>
+                                                                                                </span>
+                                                                                            )}
+                                                                                            {hasClientAccrued && <span className="text-[7px] font-bold text-sky-400 mt-0.5">+Client</span>}
+                                                                                        </>
+                                                                                    );
+                                                                                })()}
                                                                             </div>
                                                                         </td>
                                                                     )}
@@ -644,18 +667,41 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                 <span className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[60px] mb-1" title={p.domain_name}>
                                                                                     {p.domain_name || 'N/A'}
                                                                                 </span>
-                                                                                <div className={`p-1 w-6 h-6 rounded flex items-center justify-center mx-auto ${(p.category_status as any)?.domain === 'Paid' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-500/10 text-slate-400'}`} title="Domain">
-                                                                                    <Globe size={12} />
-                                                                                </div>
-                                                                                {(p.domain_count ?? 0) > 0 && (
-                                                                                    <span className="text-[10px] font-black block mt-1">
-                                                                                        <span className={p.paid_domain_count === p.domain_count ? "text-emerald-500" : "text-slate-500"}>
-                                                                                            {p.paid_domain_count || 0}
-                                                                                        </span>
-                                                                                        <span className="text-slate-400 font-medium mx-0.5">/</span>
-                                                                                        <span className="text-slate-500">{p.domain_count}</span>
-                                                                                    </span>
-                                                                                )}
+                                                                                {(() => {
+                                                                                    const domainItems = (p.category_status as any)?.domain_items || [];
+                                                                                    const hasClientAccrued = domainItems.some((d: any) => d.accrued_by && d.accrued_by !== 'Extechnology');
+                                                                                    const allClientAccrued = domainItems.length > 0 && domainItems.every((d: any) => d.accrued_by && d.accrued_by !== 'Extechnology');
+
+                                                                                    if (allClientAccrued) {
+                                                                                        const label = domainItems[0]?.accrued_by === 'Client' ? 'Client' : '3rd Party';
+                                                                                        return (
+                                                                                            <>
+                                                                                                <div className="p-1 w-6 h-6 rounded flex items-center justify-center mx-auto bg-sky-500/10 text-sky-500" title={`${label} Accrued`}>
+                                                                                                    <Globe size={12} />
+                                                                                                </div>
+                                                                                                <span className="text-[8px] font-black text-sky-500 mt-1 uppercase">{label}</span>
+                                                                                            </>
+                                                                                        );
+                                                                                    }
+
+                                                                                    return (
+                                                                                        <>
+                                                                                            <div className={`p-1 w-6 h-6 rounded flex items-center justify-center mx-auto ${(p.category_status as any)?.domain === 'Paid' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-slate-500/10 text-slate-400'}`} title="Domain">
+                                                                                                <Globe size={12} />
+                                                                                            </div>
+                                                                                            {(p.domain_count ?? 0) > 0 && (
+                                                                                                <span className="text-[10px] font-black block mt-1">
+                                                                                                    <span className={p.paid_domain_count === p.domain_count ? "text-emerald-500" : "text-slate-500"}>
+                                                                                                        {p.paid_domain_count || 0}
+                                                                                                    </span>
+                                                                                                    <span className="text-slate-400 font-medium mx-0.5">/</span>
+                                                                                                    <span className="text-slate-500">{p.domain_count}</span>
+                                                                                                </span>
+                                                                                            )}
+                                                                                            {hasClientAccrued && <span className="text-[7px] font-bold text-sky-400 mt-0.5">+Client</span>}
+                                                                                        </>
+                                                                                    );
+                                                                                })()}
                                                                             </div>
                                                                         </td>
                                                                     )}
@@ -709,7 +755,8 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                 (p.serviceteam_count || 0) + 
                                                                                 (p.server_count || 0) + 
                                                                                 (p.domain_count || 0) + 
-                                                                                (p.exbot_count || 0);
+                                                                                (p.exbot_count || 0) +
+                                                                                (p.finance_count || 0);
 
                                                                             if (totalItems === 0) return null;
 
@@ -720,7 +767,8 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                 paidServices + 
                                                                                 (p.paid_server_count || 0) + 
                                                                                 (p.paid_domain_count || 0) + 
-                                                                                (p.paid_exbot_count || 0);
+                                                                                (p.paid_exbot_count || 0) +
+                                                                                (p.paid_finance_count || 0);
 
                                                                             const pct = Math.round((paidItems / totalItems) * 100);
                                                                             const allPaid = paidItems === totalItems;
@@ -770,13 +818,19 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                     <Layout size={12} /> ENTITY DETAILS
                                                                                                 </p>
                                                                                             </div>
-                                                                                            <div className="flex-1">
+                                                                                            <div className="flex-1 text-center">
                                                                                                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.15em]">TIMELINE & DEADLINES</p>
                                                                                             </div>
-                                                                                            <div className="w-32">
+                                                                                            <div className="w-24 text-center">
                                                                                                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.15em]">FINANCIALS</p>
                                                                                             </div>
-                                                                                            <div className="w-36 text-right">
+                                                                                            <div className="w-24 text-center">
+                                                                                                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.15em]">INVOICE STATUS</p>
+                                                                                            </div>
+                                                                                            <div className="w-28 text-center">
+                                                                                                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.15em]">PAYMENT STATUS</p>
+                                                                                            </div>
+                                                                                            <div className="w-28 text-right">
                                                                                                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.15em]">WORK STATUS</p>
                                                                                             </div>
                                                                                         </div>
@@ -792,7 +846,9 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                     paidStatus: string | null,
                                                                                                     deadline: string | null,
                                                                                                     status: string | null,
-                                                                                                    type: 'project' | 'service' | 'infra' = 'service'
+                                                                                                    type: 'project' | 'service' | 'infra' = 'service',
+                                                                                                    accruedBy?: string,
+                                                                                                    invoiceStatus?: string | null
                                                                                                 ) => {
                                                                                                     const dl = deadline ? new Date(deadline) : null;
                                                                                                     if (dl) dl.setHours(0, 0, 0, 0);
@@ -822,7 +878,7 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                             </div>
 
                                                                                                             {/* 2. Timeline Information */}
-                                                                                                            <div className="flex-1 flex items-center gap-4">
+                                                                                                            <div className="flex-1 flex items-center justify-center gap-4">
                                                                                                                 {deadline ? (
                                                                                                                     <>
                                                                                                                         <div className="flex flex-col">
@@ -844,15 +900,34 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                             </div>
 
                                                                                                             {/* 3. Financial Information */}
-                                                                                                            <div className="w-32 flex flex-col items-start gap-0.5">
-                                                                                                                <span className="text-[11px] font-black text-foreground drop-shadow-sm">{formatCurrency(cost)}</span>
-                                                                                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border leading-none ${paidStatus?.toLowerCase() === 'paid' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-rose-500 bg-rose-500/10 border-rose-500/20'}`}>
-                                                                                                                    {paidStatus?.toUpperCase() || 'UNPAID'}
+                                                                                                            <div className="w-24 flex flex-col items-center justify-center gap-0.5">
+                                                                                                                <span className={`text-[11px] font-black drop-shadow-sm ${accruedBy && accruedBy !== 'Extechnology' ? 'line-through text-slate-500/50' : 'text-foreground'}`}>
+                                                                                                                    {formatCurrency(cost)}
                                                                                                                 </span>
                                                                                                             </div>
 
-                                                                                                            {/* 4. Status Information */}
-                                                                                                            <div className="w-36 text-right flex flex-col items-end gap-1">
+                                                                                                            {/* 4. Invoice Status */}
+                                                                                                            <div className="w-24 flex items-center justify-center">
+                                                                                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border leading-none ${invoiceStatus?.toLowerCase() === 'invoiced' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-amber-500 bg-amber-500/10 border-amber-500/20'}`}>
+                                                                                                                    {invoiceStatus?.toUpperCase() || 'NOT INVOICED'}
+                                                                                                                </span>
+                                                                                                            </div>
+
+                                                                                                            {/* 5. Payment Status */}
+                                                                                                            <div className="w-28 flex items-center justify-center">
+                                                                                                                {accruedBy && accruedBy !== 'Extechnology' ? (
+                                                                                                                    <span className="text-[8.5px] font-black px-1.5 py-0.5 rounded border leading-none text-sky-500 bg-sky-500/10 border-sky-500/20">
+                                                                                                                        {accruedBy.toUpperCase()} ACCRUED
+                                                                                                                    </span>
+                                                                                                                ) : (
+                                                                                                                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border leading-none ${paidStatus?.toLowerCase() === 'paid' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-rose-500 bg-rose-500/10 border-rose-500/20'}`}>
+                                                                                                                        {paidStatus?.toUpperCase() || 'UNPAID'}
+                                                                                                                    </span>
+                                                                                                                )}
+                                                                                                            </div>
+
+                                                                                                            {/* 6. Status Information */}
+                                                                                                            <div className="w-28 text-right flex flex-col items-end justify-center gap-1">
                                                                                                                 {type !== 'infra' && (status ? (
                                                                                                                     <>
                                                                                                                         <StatusBadge status={status} />
@@ -892,7 +967,9 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                                 ex.payment_status,
                                                                                                                 ex.deadline,
                                                                                                                 null,
-                                                                                                                'infra'
+                                                                                                                'infra',
+                                                                                                                undefined,
+                                                                                                                ex.invoice_status
                                                                                                             )
                                                                                                         ))}
 
@@ -907,7 +984,9 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                                 svc.service_team_status && svc.service_team_status.toLowerCase() !== 'completed' && svc.service_team_status !== 'No Team'
                                                                                                                     ? svc.service_team_status
                                                                                                                     : svc.status,
-                                                                                                                'service'
+                                                                                                                'service',
+                                                                                                                undefined,
+                                                                                                                svc.invoice_status
                                                                                                             )
                                                                                                         ))}
 
@@ -922,11 +1001,13 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                                         item.payment_status || null,
                                                                                                                         item.deadline || null,
                                                                                                                         null,
-                                                                                                                        'infra'
+                                                                                                                        'infra',
+                                                                                                                        item.accrued_by,
+                                                                                                                        item.invoice_status
                                                                                                                     )
                                                                                                                 ))}
                                                                                                                 {(!p.category_status?.server_items || p.category_status.server_items.length === 0) && p.category_status?.server !== 'NA' && (
-                                                                                                                    renderExpandedRow('Server', 'Server Hosting', p.server_cost || 0, p.category_status?.server || null, p.server_deadline || null, null, 'infra')
+                                                                                                                    renderExpandedRow('Server', 'Server Hosting', p.server_cost || 0, p.category_status?.server || null, p.server_deadline || null, null, 'infra', undefined, p.category_status?.server_invoice_status || null)
                                                                                                                 )}
                                                                                                             </>
                                                                                                         )}
@@ -940,11 +1021,13 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                                                         item.payment_status || null,
                                                                                                                         item.deadline || null,
                                                                                                                         null,
-                                                                                                                        'infra'
+                                                                                                                        'infra',
+                                                                                                                        item.accrued_by,
+                                                                                                                        item.invoice_status
                                                                                                                     )
                                                                                                                 ))}
                                                                                                                 {(!p.category_status?.domain_items || p.category_status.domain_items.length === 0) && p.category_status?.domain !== 'NA' && (
-                                                                                                                    renderExpandedRow('Infrastructure', 'Web Domain', p.domain_cost || 0, p.category_status?.domain || null, p.domain_deadline || null, null, 'infra')
+                                                                                                                    renderExpandedRow('Infrastructure', 'Web Domain', p.domain_cost || 0, p.category_status?.domain || null, p.domain_deadline || null, null, 'infra', undefined, p.category_status?.domain_invoice_status || null)
                                                                                                                 )}
                                                                                                             </>
                                                                                                         )}
@@ -953,7 +1036,44 @@ const AnalyticalDashboard: React.FC = () => {
                                                                                             })()}
                                                                                         </div>
 
-                                                                                        {(p.services?.length ?? 0) === 0 && (
+                                                                                        {(p.project_finances && p.project_finances.length > 0) && (
+                                                                                                        <div className="mt-2 space-y-1.5">
+                                                                                                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest px-6 pb-1 flex items-center gap-1.5"><Banknote size={9} /> Finance Records</p>
+                                                                                                            {p.project_finances.map((pf: any) => (
+                                                                                                                <div key={pf.id} className="bg-emerald-500/5 hover:bg-emerald-500/10 transition-all flex items-center gap-6 px-6 py-2.5 rounded-xl border border-emerald-500/10 hover:border-emerald-500/25">
+                                                                                                                    <div className="w-[200px] flex items-center gap-3">
+                                                                                                                        <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 flex-shrink-0"><Banknote size={12} /></div>
+                                                                                                                        <div className="min-w-0">
+                                                                                                                            <p className="text-[8px] font-black uppercase tracking-wider text-emerald-400">Finance</p>
+                                                                                                                            <p className="text-[11px] font-black text-foreground uppercase -mt-0.5">RECORD #{pf.id}</p>
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                    <div className="flex-1 flex items-center justify-center gap-4">
+                                                                                                                        {/* Blank since Finance has no expiry timeline */}
+                                                                                                                    </div>
+                                                                                                                    <div className="w-24 flex flex-col items-center justify-center gap-0.5">
+                                                                                                                        <span className="text-[11px] font-black drop-shadow-sm text-foreground">
+                                                                                                                            {formatCurrency(pf.project_cost || 0)}
+                                                                                                                        </span>
+                                                                                                                    </div>
+                                                                                                                    <div className="w-24 flex items-center justify-center">
+                                                                                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border leading-none ${pf.invoice_status === 'INVOICED' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-amber-500 bg-amber-500/10 border-amber-500/20'}`}>
+                                                                                                                            {pf.invoice_status === 'INVOICED' ? 'INVOICED' : 'NOT INVOICED'}
+                                                                                                                        </span>
+                                                                                                                    </div>
+                                                                                                                    <div className="w-28 flex items-center justify-center">
+                                                                                                                        <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border leading-none ${pf.payment_status === 'PAID' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' : 'text-rose-500 bg-rose-500/10 border-rose-500/20'}`}>
+                                                                                                                            {pf.payment_status?.toUpperCase() || 'UNPAID'}
+                                                                                                                        </span>
+                                                                                                                    </div>
+                                                                                                                    <div className="w-28 text-right flex flex-col items-end gap-1">
+                                                                                                                        {/* Blank */}
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                            ))}
+                                                                                                        </div>
+                                                                                                    )}
+                                                                                                    {(p.services?.length ?? 0) === 0 && (
                                                                                             <div className="px-4 py-8 text-center bg-muted/5 rounded-xl border border-dashed border-border/50">
                                                                                                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">No service teams assigned</p>
                                                                                             </div>

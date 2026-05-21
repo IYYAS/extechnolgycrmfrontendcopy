@@ -25,7 +25,9 @@ import {
     Layers,
     Bell,
     MessageSquare,
-    Target
+    Target,
+    GripVertical,
+    Settings
 } from 'lucide-react';
 
 import { useLocation, Link } from 'react-router-dom';
@@ -47,6 +49,86 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
     const [expiringExbotsCount, setExpiringExbotsCount] = React.useState(0);
     const [companyName, setCompanyName] = React.useState('Extechnology');
     const [companyLogo, setCompanyLogo] = React.useState<string | null>(null);
+
+    const [isCustomizing, setIsCustomizing] = React.useState(false);
+    const [draggedIndex, setDraggedIndex] = React.useState<number | null>(null);
+
+    const defaultOrder = [
+        'analytics',
+        'notifications',
+        'reports',
+        'users',
+        'teams',
+        'projects',
+        'leads',
+        'servers',
+        'domains',
+        'exbots',
+        'invoices',
+        'other-incomes',
+        'other-expenses',
+        'activities',
+        'attendance',
+        'leaves',
+        'salaries',
+        'set-salaries',
+        'employee-performance',
+        'profile',
+        'extech-profile',
+        'roles'
+    ];
+
+    const [sidebarOrder, setSidebarOrder] = React.useState<string[]>(() => {
+        const saved = localStorage.getItem('sidebar_order');
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    const validKeys = parsed.filter((key: string) => defaultOrder.includes(key));
+                    const missingKeys = defaultOrder.filter((key: string) => !validKeys.includes(key));
+                    return [...validKeys, ...missingKeys];
+                }
+            } catch (e) {
+                console.error('Failed to parse sidebar order from localStorage', e);
+            }
+        }
+        return defaultOrder;
+    });
+
+
+
+    const handleDragStart = (e: React.DragEvent, index: number) => {
+        if (!isCustomizing) {
+            e.preventDefault();
+            return;
+        }
+        setDraggedIndex(index);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', index.toString());
+    };
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        if (!isCustomizing || draggedIndex === null || draggedIndex === index) return;
+
+        const newOrder = [...sidebarOrder];
+        const draggedItem = newOrder[draggedIndex];
+        newOrder.splice(draggedIndex, 1);
+        newOrder.splice(index, 0, draggedItem);
+        setSidebarOrder(newOrder);
+        setDraggedIndex(index);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        if (!isCustomizing) return;
+        localStorage.setItem('sidebar_order', JSON.stringify(sidebarOrder));
+        setDraggedIndex(null);
+    };
+
+    const handleDragEnd = () => {
+        setDraggedIndex(null);
+    };
 
     const fetchCounts = async () => {
         try {
@@ -113,6 +195,212 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
     const { hasPermission } = usePermission();
     const canView = (permission: string | string[]) => hasPermission(permission);
 
+    const itemsMap: Record<string, {
+        id: string;
+        label: string;
+        icon: React.ReactNode;
+        path: string;
+        permissionCheck?: () => boolean;
+        isActive: boolean;
+        suffix?: React.ReactNode;
+    }> = {
+        analytics: {
+            id: 'analytics',
+            label: 'Analytics',
+            icon: <LayoutDashboard size={20} />,
+            path: '/dashboard',
+            permissionCheck: () => canView('view_analytics'),
+            isActive: isActive('/dashboard')
+        },
+        notifications: {
+            id: 'notifications',
+            label: 'Notifications',
+            icon: <Bell size={20} />,
+            path: '/notifications',
+            isActive: isActive('/notifications'),
+            suffix: unreadCount > 0 ? (
+                <span className="bg-primary text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-primary/30 animate-pulse">
+                    {unreadCount}
+                </span>
+            ) : undefined
+        },
+        reports: {
+            id: 'reports',
+            label: 'Reports',
+            icon: <BarChart3 size={20} />,
+            path: '/reports',
+            permissionCheck: () => canView('view_reports'),
+            isActive: isActive('/reports')
+        },
+        users: {
+            id: 'users',
+            label: 'Users',
+            icon: <Users size={20} />,
+            path: '/users',
+            permissionCheck: () => canView('view_user'),
+            isActive: isActive('/users')
+        },
+        teams: {
+            id: 'teams',
+            label: 'Teams',
+            icon: <Layers size={20} />,
+            path: '/team-performance',
+            permissionCheck: () => canView('view_team') || canView(['view_teamperformance', 'view_all_team_performance', 'view_own_team_performance']),
+            isActive: isActive('/team-performance')
+        },
+        projects: {
+            id: 'projects',
+            label: 'Projects',
+            icon: <Briefcase size={20} />,
+            path: '/projects',
+            permissionCheck: () => canView('view_project'),
+            isActive: isActive('/projects')
+        },
+        leads: {
+            id: 'leads',
+            label: 'Leads',
+            icon: <Target size={20} />,
+            path: '/leads/dashboard',
+            permissionCheck: () => canView('view_lead'),
+            isActive: location.pathname.startsWith('/leads')
+        },
+        servers: {
+            id: 'servers',
+            label: 'Servers',
+            icon: <Server size={20} />,
+            path: '/infrastructure/servers',
+            permissionCheck: () => canView('view_projectserver'),
+            isActive: isActive('/infrastructure/servers'),
+            suffix: expiringServersCount > 0 ? (
+                <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 animate-pulse">
+                    {expiringServersCount}
+                </span>
+            ) : undefined
+        },
+        domains: {
+            id: 'domains',
+            label: 'Domains',
+            icon: <Globe size={20} />,
+            path: '/infrastructure/domains',
+            permissionCheck: () => canView('view_projectdomain'),
+            isActive: isActive('/infrastructure/domains'),
+            suffix: expiringDomainsCount > 0 ? (
+                <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 animate-pulse">
+                    {expiringDomainsCount}
+                </span>
+            ) : undefined
+        },
+        exbots: {
+            id: 'exbots',
+            label: 'Exbots',
+            icon: <MessageSquare size={20} />,
+            path: '/infrastructure/exbots',
+            permissionCheck: () => canView('view_projectexbot'),
+            isActive: isActive('/infrastructure/exbots'),
+            suffix: expiringExbotsCount > 0 ? (
+                <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 animate-pulse">
+                    {expiringExbotsCount}
+                </span>
+            ) : undefined
+        },
+        invoices: {
+            id: 'invoices',
+            label: 'Invoices',
+            icon: <FileText size={20} />,
+            path: '/invoices/company-summary',
+            permissionCheck: () => canView('view_invoice'),
+            isActive: isActive('/invoices/company-summary')
+        },
+        'other-incomes': {
+            id: 'other-incomes',
+            label: 'Other Incomes',
+            icon: <DollarSign size={20} />,
+            path: '/other-incomes',
+            permissionCheck: () => canView('view_otherincome'),
+            isActive: isActive('/other-incomes')
+        },
+        'other-expenses': {
+            id: 'other-expenses',
+            label: 'Other Expenses',
+            icon: <Receipt size={20} />,
+            path: '/other-expenses',
+            permissionCheck: () => canView('view_otherexpense'),
+            isActive: isActive('/other-expenses')
+        },
+        activities: {
+            id: 'activities',
+            label: 'Activities',
+            icon: <Clock size={20} />,
+            path: '/activities',
+            permissionCheck: () => canView(['view_all_activities', 'view_own_activities']),
+            isActive: isActive('/activities')
+        },
+        attendance: {
+            id: 'attendance',
+            label: 'Attendance',
+            icon: <CalendarCheck size={20} />,
+            path: '/attendance',
+            permissionCheck: () => canView('view_attendance'),
+            isActive: isActive('/attendance')
+        },
+        leaves: {
+            id: 'leaves',
+            label: 'Leaves',
+            icon: <ClipboardList size={20} />,
+            path: '/leaves',
+            permissionCheck: () => canView('view_employeeleave'),
+            isActive: isActive('/leaves')
+        },
+        salaries: {
+            id: 'salaries',
+            label: 'Salaries',
+            icon: <Wallet size={20} />,
+            path: '/salaries',
+            permissionCheck: () => canView('view_salary'),
+            isActive: isActive('/salaries')
+        },
+        'set-salaries': {
+            id: 'set-salaries',
+            label: 'Set Salaries',
+            icon: <UserCog size={20} />,
+            path: '/user-salaries',
+            permissionCheck: () => canView('view_usersalary'),
+            isActive: isActive('/user-salaries')
+        },
+        'employee-performance': {
+            id: 'employee-performance',
+            label: 'Employee Performance',
+            icon: <BarChart3 size={20} />,
+            path: '/employee-performance',
+            permissionCheck: () => canView(['view_all_employee_performance', 'view_own_employee_performance']),
+            isActive: isActive('/employee-performance')
+        },
+        profile: {
+            id: 'profile',
+            label: 'Profile',
+            icon: <UserCircle size={20} />,
+            path: '/profile',
+            isActive: isActive('/profile')
+        },
+        'extech-profile': {
+            id: 'extech-profile',
+            label: 'Extech Profile',
+            icon: <Building2 size={20} />,
+            path: '/company-profile',
+            permissionCheck: () => canView('view_companyprofile'),
+            isActive: isActive('/company-profile')
+        },
+        roles: {
+            id: 'roles',
+            label: 'Role Management',
+            icon: <UserCog size={20} />,
+            path: '/roles',
+            permissionCheck: () => canView('view_role'),
+            isActive: isActive('/roles')
+        }
+    };
+
+
     const menuItemStyles = {
         button: ({ active }: { active: boolean }) => ({
             backgroundColor: active ? 'var(--primary-subtle)' : 'transparent',
@@ -158,20 +446,41 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                     </button>
                 </div>
 
-                {/* Theme Selector */}
+                {/* Theme & Layout Selector */}
                 {!collapsed && (
                     <div className="px-6 py-4 border-b border-white/5 space-y-4">
                         <div className="flex items-center justify-between group relative">
                             <span className="text-xs font-semibold text-muted uppercase tracking-wider">Appearance</span>
                             <div className="flex items-center gap-2">
                                 <button
+                                    onClick={() => setIsCustomizing(!isCustomizing)}
+                                    className={`p-2 rounded-xl transition-all ${isCustomizing ? 'bg-primary text-white hover:bg-primary-hover shadow-md' : 'bg-primary/10 text-primary hover:bg-primary/20'}`}
+                                    title={isCustomizing ? "Lock Sidebar Layout" : "Customize Sidebar Layout"}
+                                >
+                                    <Settings size={18} className={isCustomizing ? 'animate-spin' : ''} style={{ animationDuration: '3s' }} />
+                                </button>
+                                <button
                                     onClick={toggleMode}
                                     className="p-2 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+                                    title="Toggle Theme"
                                 >
                                     {mode === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                                 </button>
                             </div>
                         </div>
+                        {isCustomizing && (
+                            <button
+                                onClick={() => {
+                                    if (confirm('Reset sidebar layout to default?')) {
+                                        setSidebarOrder(defaultOrder);
+                                        localStorage.removeItem('sidebar_order');
+                                    }
+                                }}
+                                className="w-full text-[10px] text-center text-rose-500 hover:text-rose-600 transition-colors uppercase font-bold tracking-wider pt-2"
+                            >
+                                Reset Layout
+                            </button>
+                        )}
                         <div className="space-y-2">
                             <div className="flex items-center space-x-2 text-muted">
                                 <Pipette size={14} />
@@ -201,232 +510,54 @@ const SidebarComponent: React.FC<SidebarProps> = ({ collapsed, setCollapsed }) =
                 {/* Content */}
                 <div className="flex-1 py-4">
                     <Menu menuItemStyles={menuItemStyles}>
-                        {canView('view_analytics') && (
-                            <MenuItem
-                                icon={<LayoutDashboard size={20} />}
-                                component={<Link to="/dashboard" />}
-                                active={isActive('/dashboard')}
-                            >
-                                Analytics
-                            </MenuItem>
-                        )}
-                        <MenuItem
-                            icon={<Bell size={20} />}
-                            component={<Link to="/notifications" />}
-                            active={isActive('/notifications')}
-                            suffix={
-                                unreadCount > 0 ? (
-                                    <span className="bg-primary text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-primary/30 animate-pulse">
-                                        {unreadCount}
-                                    </span>
-                                ) : undefined
-                            }
-                        >
-                            Notifications
-                        </MenuItem>
-                        {canView('view_reports') && (
-                            <MenuItem
-                                icon={<BarChart3 size={20} />}
-                                component={<Link to="/reports" />}
-                                active={isActive('/reports')}
-                            >
-                                Reports
-                            </MenuItem>
-                        )}
-                        {canView('view_user') && (
-                            <MenuItem
-                                icon={<Users size={20} />}
-                                component={<Link to="/users" />}
-                                active={isActive('/users')}
-                            >
-                                Users
-                            </MenuItem>
-                        )}
+                        {sidebarOrder.map((key, index) => {
+                            const item = itemsMap[key];
+                            if (!item) return null;
+                            if (item.permissionCheck && !item.permissionCheck()) return null;
 
-                        {(canView('view_team') || canView(['view_teamperformance', 'view_all_team_performance', 'view_own_team_performance'])) && (
-                            <MenuItem
-                                icon={<Layers size={20} />}
-                                component={<Link to="/team-performance" />}
-                                active={isActive('/team-performance')}
-                            >
-                                Teams
-                            </MenuItem>
-                        )}
-                        {canView('view_project') && (
-                            <MenuItem
-                                icon={<Briefcase size={20} />}
-                                component={<Link to="/projects" />}
-                                active={isActive('/projects')}
-                            >
-                                Projects
-                            </MenuItem>
-                        )}
-                        {canView('view_lead') && (
-                            <MenuItem
-                                icon={<Target size={20} />}
-                                component={<Link to="/leads/dashboard" />}
-                                active={location.pathname.startsWith('/leads')}
-                            >
-                                Leads
-                            </MenuItem>
-                        )}
-
-                        {canView('view_projectserver') && (
-                            <MenuItem
-                                icon={<Server size={20} />}
-                                component={<Link to="/infrastructure/servers" />}
-                                active={isActive('/infrastructure/servers')}
-                                suffix={
-                                    expiringServersCount > 0 ? (
-                                        <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 animate-pulse">
-                                            {expiringServersCount}
+                            return (
+                                <div
+                                    key={item.id}
+                                    draggable={isCustomizing}
+                                    onDragStart={(e) => handleDragStart(e, index)}
+                                    onDragOver={(e) => handleDragOver(e, index)}
+                                    onDrop={handleDrop}
+                                    onDragEnd={handleDragEnd}
+                                    className={`relative transition-all duration-200 ${
+                                        isCustomizing 
+                                            ? draggedIndex === index
+                                                ? 'opacity-40 border-2 border-dashed border-primary/40 rounded-lg mx-2'
+                                                : 'hover:bg-primary/5 cursor-grab active:cursor-grabbing rounded-lg mx-2 my-1'
+                                            : ''
+                                    }`}
+                                >
+                                    <MenuItem
+                                        icon={
+                                            isCustomizing && !collapsed ? (
+                                                <div className="flex items-center justify-center text-muted/60 hover:text-primary">
+                                                    <GripVertical size={18} />
+                                                </div>
+                                            ) : (
+                                                item.icon
+                                            )
+                                        }
+                                        component={
+                                            isCustomizing ? (
+                                                <div className="w-full h-full" onClick={(e) => e.preventDefault()} />
+                                            ) : (
+                                                <Link to={item.path} />
+                                            )
+                                        }
+                                        active={!isCustomizing && item.isActive}
+                                        suffix={isCustomizing ? null : item.suffix}
+                                    >
+                                        <span className={isCustomizing ? 'text-primary/95 font-semibold text-sm' : ''}>
+                                            {item.label}
                                         </span>
-                                    ) : undefined
-                                }
-                            >
-                                Servers
-                            </MenuItem>
-                        )}
-                        {canView('view_projectdomain') && (
-                            <MenuItem
-                                icon={<Globe size={20} />}
-                                component={<Link to="/infrastructure/domains" />}
-                                active={isActive('/infrastructure/domains')}
-                                suffix={
-                                    expiringDomainsCount > 0 ? (
-                                        <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 animate-pulse">
-                                            {expiringDomainsCount}
-                                        </span>
-                                    ) : undefined
-                                }
-                            >
-                                Domains
-                            </MenuItem>
-                        )}
-                        {canView('view_projectexbot') && (
-                            <MenuItem
-                                icon={<MessageSquare size={20} />}
-                                component={<Link to="/infrastructure/exbots" />}
-                                active={isActive('/infrastructure/exbots')}
-                                suffix={
-                                    expiringExbotsCount > 0 ? (
-                                        <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg shadow-rose-500/30 animate-pulse">
-                                            {expiringExbotsCount}
-                                        </span>
-                                    ) : undefined
-                                }
-                            >
-                                Exbots
-                            </MenuItem>
-                        )}
-
-                        {canView('view_invoice') && (
-                            <MenuItem
-                                icon={<FileText size={20} />}
-                                component={<Link to="/invoices/company-summary" />}
-                                active={isActive('/invoices/company-summary')}
-                            >
-                                Invoices
-                            </MenuItem>
-                        )}
-                        {canView('view_otherincome') && (
-                            <MenuItem
-                                icon={<DollarSign size={20} />}
-                                component={<Link to="/other-incomes" />}
-                                active={isActive('/other-incomes')}
-                            >
-                                Other Incomes
-                            </MenuItem>
-                        )}
-                        {canView('view_otherexpense') && (
-                            <MenuItem
-                                icon={<Receipt size={20} />}
-                                component={<Link to="/other-expenses" />}
-                                active={isActive('/other-expenses')}
-                            >
-                                Other Expenses
-                            </MenuItem>
-                        )}
-                        {canView(['view_all_activities', 'view_own_activities']) && (
-                            <MenuItem
-                                icon={<Clock size={20} />}
-                                component={<Link to="/activities" />}
-                                active={isActive('/activities')}
-                            >
-                                Activities
-                            </MenuItem>
-                        )}
-                        {canView('view_attendance') && (
-                            <MenuItem
-                                icon={<CalendarCheck size={20} />}
-                                component={<Link to="/attendance" />}
-                                active={isActive('/attendance')}
-                            >
-                                Attendance
-                            </MenuItem>
-                        )}
-                        {canView('view_employeeleave') && (
-                            <MenuItem
-                                icon={<ClipboardList size={20} />}
-                                component={<Link to="/leaves" />}
-                                active={isActive('/leaves')}
-                            >
-                                Leaves
-                            </MenuItem>
-                        )}
-                        {canView('view_salary') && (
-                            <MenuItem
-                                icon={<Wallet size={20} />}
-                                component={<Link to="/salaries" />}
-                                active={isActive('/salaries')}
-                            >
-                                Salaries
-                            </MenuItem>
-                        )}
-                        {canView('view_usersalary') && (
-                            <MenuItem
-                                icon={<UserCog size={20} />}
-                                component={<Link to="/user-salaries" />}
-                                active={isActive('/user-salaries')}
-                            >
-                                Set Salaries
-                            </MenuItem>
-                        )}
-                        {canView(['view_all_employee_performance', 'view_own_employee_performance']) && (
-                            <MenuItem
-                                icon={<BarChart3 size={20} />}
-                                component={<Link to="/employee-performance" />}
-                                active={isActive('/employee-performance')}
-                            >
-                                Employee Performance
-                            </MenuItem>
-                        )}
-
-                        <MenuItem
-                            icon={<UserCircle size={20} />}
-                            component={<Link to="/profile" />}
-                            active={isActive('/profile')}
-                        >
-                            Profile
-                        </MenuItem>
-                        {canView('view_companyprofile') && (
-                            <MenuItem
-                                icon={<Building2 size={20} />}
-                                component={<Link to="/company-profile" />}
-                                active={isActive('/company-profile')}
-                            >
-                                Extech Profile
-                            </MenuItem>
-                        )}
-                        {canView('view_role') && (
-                            <MenuItem
-                                icon={<UserCog size={20} />}
-                                component={<Link to="/roles" />}
-                                active={isActive('/roles')}
-                            >
-                                Role Management
-                            </MenuItem>
-                        )}
+                                    </MenuItem>
+                                </div>
+                            );
+                        })}
                     </Menu>
                 </div>
 

@@ -247,6 +247,7 @@ const ServiceFormCard: React.FC<{
     onBill?: (type: string, name: string, cost: string | number, purchaseDate?: string, expiryDate?: string, entityId?: number) => void;
     setIsQuickTeamModalOpen: (open: boolean) => void;
     setTeamAssignmentTarget: (target: { type: 'service' | 'project', idx: number } | null) => void;
+
     syncTeamMembers: (sIdx: number) => void;
 }> = ({
     service, sIdx, addServiceTeamMember, removeServiceTeamMember,
@@ -906,7 +907,7 @@ const ProjectForm: React.FC = () => {
         ]);
     };
     const [teamAssignmentTarget, setTeamAssignmentTarget] = useState<{ type: 'service' | 'project', idx: number } | null>(null);
-
+    const [infraTab, setInfraTab] = useState<'domains' | 'servers' | 'exbots'>('domains');
     const blankBase = () => ({
         project_approach_date: new Date().toISOString().split('T')[0],
         name: '', description: '', creator_name: '', creator_designation: ''
@@ -916,8 +917,7 @@ const ProjectForm: React.FC = () => {
         assigned_delivery_date: '', start_date: '', confirmed_end_date: '', end_date: null
     });
     const blankFinance = () => ({
-        project_cost: '0.00', manpower_cost: '0.00', total_invoiced: '0.00',
-        total_paid: '0.00', total_balance_due: '0.00'
+        project_cost: '0.00'
     });
     const blankClient = () => ({
         company_name: '', contact_person: '', email: '', phone: ''
@@ -1449,10 +1449,7 @@ const ProjectForm: React.FC = () => {
             }
             if (finalFormData.project_finances) {
                 finalFormData.project_finances = finalFormData.project_finances.filter((f: any) =>
-                    (f.project_cost && f.project_cost !== '0.00' && f.project_cost !== '0') ||
-                    (f.manpower_cost && f.manpower_cost !== '0.00' && f.manpower_cost !== '0') ||
-                    (f.total_invoiced && f.total_invoiced !== '0.00' && f.total_invoiced !== '0') ||
-                    (f.total_paid && f.total_paid !== '0.00' && f.total_paid !== '0')
+                    (f.project_cost && f.project_cost !== '0.00' && f.project_cost !== '0')
                 );
             }
             if (finalFormData.project_excutions) {
@@ -1807,7 +1804,6 @@ const ProjectForm: React.FC = () => {
                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {[
                                             { key: 'project_cost', label: 'Total Budget', placeholder: '0.00' },
-                                            { key: 'manpower_cost', label: 'Manpower Cost', placeholder: '0.00' },
                                         ].map(({ key, label, placeholder }) => (
                                             <div key={key} className="space-y-2">
                                                 <label className={labelCls}>{label}</label>
@@ -1846,6 +1842,18 @@ const ProjectForm: React.FC = () => {
                                                     </button>
                                                 )}
                                             </div>
+                                        </div>
+                                        <div className="md:col-span-1 flex flex-col justify-end space-y-2 pb-1">
+                                            <label className={labelCls}>Payment Status</label>
+                                            <select
+                                                value={fin.payment_status || 'UNPAID'}
+                                                disabled={!hasPermission('change_projectfinance')}
+                                                onChange={e => setNested('project_finances', idx, 'payment_status', e.target.value)}
+                                                className={`${inputCls} font-bold ${fin.payment_status === 'PAID' ? 'text-emerald-500' : 'text-amber-500'}`}
+                                            >
+                                                <option value="UNPAID">Unpaid</option>
+                                                <option value="PAID">Paid</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -2124,6 +2132,7 @@ const ProjectForm: React.FC = () => {
                 )}
 
                 {/* ── 5. Infrastructure ── */}
+
                 {(hasPermission('view_projectdomain') || hasPermission('view_projectserver')) && (
                     <FormSection
                         title="Infrastructure"
@@ -2155,169 +2164,213 @@ const ProjectForm: React.FC = () => {
                                 )}
                             </div>
                         }>
+
                         <div className="space-y-6">
+                            <div className="flex items-center gap-2 mb-6">
+
+                                <button
+                                    type="button"
+                                    onClick={() => setInfraTab('domains')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${infraTab === 'domains'
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-blue-500/10 text-blue-500'
+                                        }`}
+                                >
+                                    Domains
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setInfraTab('servers')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${infraTab === 'servers'
+                                        ? 'bg-indigo-500 text-white'
+                                        : 'bg-indigo-500/10 text-indigo-500'
+                                        }`}
+                                >
+                                    Servers
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setInfraTab('exbots')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${infraTab === 'exbots'
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'bg-emerald-500/10 text-emerald-500'
+                                        }`}
+                                >
+                                    Exbots
+                                </button>
+                            </div>
+
+
+
+
                             {formData.project_domains.length === 0 && formData.project_servers.length === 0 && formData.project_exbots.length === 0 && (
                                 <p className="text-center text-muted text-sm py-6">No domains, servers, or exbots added yet.</p>
                             )}
-                            {hasPermission('view_projectdomain') && formData.project_domains?.map((domain: any, idx: number) => (
-                                <div key={idx} className="p-6 bg-blue-500/5 border border-blue-500/20 rounded-[2rem] space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-black text-blue-500 uppercase tracking-widest">🌐 Domain #{idx + 1}</span>
-                                        {hasPermission('delete_projectdomain') && (
-                                            <button type="button" onClick={() => removeItem('project_domains', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl"><Trash2 size={18} /></button>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        <div className="space-y-1">
-                                            <label className={labelCls}>Domain Name</label>
-                                            <input type="text" placeholder="e.g. mycompany.com"
-                                                disabled={!hasPermission('change_projectdomain')}
-                                                value={domain.name || ''} onChange={e => setNested('project_domains', idx, 'name', e.target.value)}
-                                                className={inputCls} />
+                            {infraTab === 'domains' &&
+                                hasPermission('view_projectdomain') && formData.project_domains?.map((domain: any, idx: number) => (
+                                    <div key={idx} className="p-6 bg-blue-500/5 border border-blue-500/20 rounded-[2rem] space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[11px] font-black text-blue-500 uppercase tracking-widest">🌐 Domain #{idx + 1}</span>
+                                            {hasPermission('delete_projectdomain') && (
+                                                <button type="button" onClick={() => removeItem('project_domains', idx)} className="text-rose-500 hover:bg-rose-500/10 p-2 rounded-xl"><Trash2 size={18} /></button>
+                                            )}
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className={labelCls}>Accrued By</label>
-                                            <select
-                                                value={domain.accrued_by || 'Extechnology'}
-                                                disabled={!hasPermission('change_projectdomain')}
-                                                onChange={e => setNested('project_domains', idx, 'accrued_by', e.target.value)}
-                                                className={inputCls}
-                                            >
-                                                <option value="Extechnology">Extechnology</option>
-                                                <option value="Client">Client</option>
-                                                <option value="Third Party">Third Party</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className={labelCls}>Purchased From</label>
-                                            <ProviderSelect
-                                                value={domain.purchased_from || ''}
-                                                onChange={(val) => setNested('project_domains', idx, 'purchased_from', val)}
-                                                options={['GoDaddy', 'Namecheap', 'Hostinger', 'Cloudflare', 'Google Domains', 'Porkbun', 'Bluehost', 'Domain.com', 'Network Solutions', 'BigRock']}
-                                                placeholder="e.g. GoDaddy"
-                                                className={`${inputCls} ${!hasPermission('change_projectdomain') ? 'opacity-60 pointer-events-none' : ''}`}
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className={labelCls}>Purchase Date</label>
-                                            <input type="date"
-                                                disabled={!hasPermission('change_projectdomain')}
-                                                value={domain.purchase_date || ''} onChange={e => setNested('project_domains', idx, 'purchase_date', e.target.value)}
-                                                className={inputCls} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <label className={`${labelCls} !mb-0`}>Expiration Date</label>
-                                                {hasPermission('change_projectdomain') && (
-                                                    <div className="flex items-center gap-1">
-                                                        {[{ label: '6m', m: 6 }, { label: '1y', m: 12 }, { label: '2y', m: 24 }, { label: '3y', m: 36 }].map(opt => (
-                                                            <button key={opt.label} type="button" onClick={(e) => { e.stopPropagation(); const pDate = domain.purchase_date || new Date().toISOString().split('T')[0]; const d = new Date(pDate); d.setUTCMonth(d.getUTCMonth() + opt.m); setNested('project_domains', idx, 'expiration_date', d.toISOString().split('T')[0]); }} className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 rounded-md font-bold transition-all">+{opt.label}</button>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            <div className="space-y-1">
+                                                <label className={labelCls}>Domain Name</label>
+                                                <input type="text" placeholder="e.g. mycompany.com"
+                                                    disabled={!hasPermission('change_projectdomain')}
+                                                    value={domain.name || ''} onChange={e => setNested('project_domains', idx, 'name', e.target.value)}
+                                                    className={inputCls} />
                                             </div>
-                                            <input type="date"
-                                                disabled={!hasPermission('change_projectdomain')}
-                                                value={domain.expiration_date || ''} onChange={e => setNested('project_domains', idx, 'expiration_date', e.target.value)}
-                                                className={inputCls} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className={labelCls}>Cost (₹)</label>
-                                            <input type="number" step="0.01" placeholder="0.00"
-                                                disabled={!hasPermission('change_projectdomain')}
-                                                value={domain.cost || ''} onChange={e => setNested('project_domains', idx, 'cost', e.target.value)}
-                                                className={`${inputCls} font-bold`} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className={labelCls}>Status</label>
-                                            <select disabled={!hasPermission('change_projectdomain')} value={domain.status || 'Active'} onChange={e => setNested('project_domains', idx, 'status', e.target.value)} className={inputCls}>
-                                                <option value="Active">Active</option>
-                                                <option value="Expired">Expired</option>
-                                                <option value="Pending">Pending</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <div className="flex items-center justify-between mb-1.5">
-                                                <label className={`${labelCls} text-emerald-500 !mb-0`}>Payment Status</label>
-                                                {domain.accrued_by === 'Extechnology' && (
-                                                    domain.invoice_status === 'INVOICED' ? (
-                                                        <div className="flex items-center gap-1 text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20" title="Domain has been invoiced">
-                                                            <FileText size={12} />
-                                                            <span className="text-[9px] font-black uppercase">Invoiced</span>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="flex items-center gap-1 text-rose-500 bg-rose-500/5 px-2 py-0.5 rounded-md border border-rose-500/10" title="Domain not yet invoiced">
-                                                            <X size={12} />
-                                                            <span className="text-[9px] font-black uppercase">Not Invoiced</span>
-                                                        </div>
-                                                    )
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <select disabled={!hasPermission('change_projectdomain')} value={domain.payment_status || 'UNPAID'} onChange={e => setNested('project_domains', idx, 'payment_status', e.target.value)} className={`${inputCls} flex-1 font-bold text-emerald-500`}>
-                                                    <option value="UNPAID">UNPAID</option>
-                                                    <option value="PARTIAL">PARTIAL</option>
-                                                    <option value="PAID">PAID</option>
+                                            <div className="space-y-1">
+                                                <label className={labelCls}>Accrued By</label>
+                                                <select
+                                                    value={domain.accrued_by || 'Extechnology'}
+                                                    disabled={!hasPermission('change_projectdomain')}
+                                                    onChange={e => setNested('project_domains', idx, 'accrued_by', e.target.value)}
+                                                    className={inputCls}
+                                                >
+                                                    <option value="Extechnology">Extechnology</option>
+                                                    <option value="Client">Client</option>
+                                                    <option value="Third Party">Third Party</option>
                                                 </select>
-                                                {domain.accrued_by === 'Extechnology' && domain.invoice_status !== 'INVOICED' && (
-                                                    <button
-                                                        type="button"
-                                                        disabled={!hasPermission('change_projectdomain')}
-                                                        onClick={() => handleBillItem('domain', domain.name || 'Domain', domain.cost || 0, domain.purchase_date, domain.expiration_date, domain.id)}
-                                                        className={`h-[46px] px-3 bg-emerald-500/10 text-emerald-500 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 ${hasPermission('change_projectdomain') ? 'hover:bg-emerald-500/20' : 'opacity-60 cursor-not-allowed'}`}
-                                                        title="Generate Invoice"
-                                                    >
-                                                        <Receipt size={18} />
-                                                        <span className="text-[10px] font-black uppercase">Bill</span>
-                                                    </button>
-                                                )}
                                             </div>
-                                        </div>
-                                        {domain.accrued_by === 'Third Party' && (
-                                            <div className="lg:col-span-3 pt-4 border-t border-border/30">
-                                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                                                    🏢 Provider Details
-                                                </p>
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Company Name</label>
-                                                        <input type="text" placeholder="e.g. GoDaddy Inc."
+                                            <div className="space-y-1">
+                                                <label className={labelCls}>Purchased From</label>
+                                                <ProviderSelect
+                                                    value={domain.purchased_from || ''}
+                                                    onChange={(val) => setNested('project_domains', idx, 'purchased_from', val)}
+                                                    options={['GoDaddy', 'Namecheap', 'Hostinger', 'Cloudflare', 'Google Domains', 'Porkbun', 'Bluehost', 'Domain.com', 'Network Solutions', 'BigRock']}
+                                                    placeholder="e.g. GoDaddy"
+                                                    className={`${inputCls} ${!hasPermission('change_projectdomain') ? 'opacity-60 pointer-events-none' : ''}`}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className={labelCls}>Purchase Date</label>
+                                                <input type="date"
+                                                    disabled={!hasPermission('change_projectdomain')}
+                                                    value={domain.purchase_date || ''} onChange={e => setNested('project_domains', idx, 'purchase_date', e.target.value)}
+                                                    className={inputCls} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <label className={`${labelCls} !mb-0`}>Expiration Date</label>
+                                                    {hasPermission('change_projectdomain') && (
+                                                        <div className="flex items-center gap-1">
+                                                            {[{ label: '6m', m: 6 }, { label: '1y', m: 12 }, { label: '2y', m: 24 }, { label: '3y', m: 36 }].map(opt => (
+                                                                <button key={opt.label} type="button" onClick={(e) => { e.stopPropagation(); const pDate = domain.purchase_date || new Date().toISOString().split('T')[0]; const d = new Date(pDate); d.setUTCMonth(d.getUTCMonth() + opt.m); setNested('project_domains', idx, 'expiration_date', d.toISOString().split('T')[0]); }} className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 rounded-md font-bold transition-all">+{opt.label}</button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <input type="date"
+                                                    disabled={!hasPermission('change_projectdomain')}
+                                                    value={domain.expiration_date || ''} onChange={e => setNested('project_domains', idx, 'expiration_date', e.target.value)}
+                                                    className={inputCls} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className={labelCls}>Cost (₹)</label>
+                                                <input type="number" step="0.01" placeholder="0.00"
+                                                    disabled={!hasPermission('change_projectdomain')}
+                                                    value={domain.cost || ''} onChange={e => setNested('project_domains', idx, 'cost', e.target.value)}
+                                                    className={`${inputCls} font-bold`} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className={labelCls}>Status</label>
+                                                <select disabled={!hasPermission('change_projectdomain')} value={domain.status || 'Active'} onChange={e => setNested('project_domains', idx, 'status', e.target.value)} className={inputCls}>
+                                                    <option value="Active">Active</option>
+                                                    <option value="Expired">Expired</option>
+                                                    <option value="Pending">Pending</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <label className={`${labelCls} text-emerald-500 !mb-0`}>Payment Status</label>
+                                                    {domain.accrued_by === 'Extechnology' && (
+                                                        domain.invoice_status === 'INVOICED' ? (
+                                                            <div className="flex items-center gap-1 text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20" title="Domain has been invoiced">
+                                                                <FileText size={12} />
+                                                                <span className="text-[9px] font-black uppercase">Invoiced</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-1 text-rose-500 bg-rose-500/5 px-2 py-0.5 rounded-md border border-rose-500/10" title="Domain not yet invoiced">
+                                                                <X size={12} />
+                                                                <span className="text-[9px] font-black uppercase">Not Invoiced</span>
+                                                            </div>
+                                                        )
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <select disabled={!hasPermission('change_projectdomain')} value={domain.payment_status || 'UNPAID'} onChange={e => setNested('project_domains', idx, 'payment_status', e.target.value)} className={`${inputCls} flex-1 font-bold text-emerald-500`}>
+                                                        <option value="UNPAID">UNPAID</option>
+                                                        <option value="PARTIAL">PARTIAL</option>
+                                                        <option value="PAID">PAID</option>
+                                                    </select>
+                                                    {domain.accrued_by === 'Extechnology' && domain.invoice_status !== 'INVOICED' && (
+                                                        <button
+                                                            type="button"
                                                             disabled={!hasPermission('change_projectdomain')}
-                                                            value={domain.provider_detail?.company_name || ''}
-                                                            onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), company_name: e.target.value })}
-                                                            className={inputCls} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Contact Person</label>
-                                                        <input type="text" placeholder="Manager Name"
-                                                            disabled={!hasPermission('change_projectdomain')}
-                                                            value={domain.provider_detail?.contact_person || ''}
-                                                            onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), contact_person: e.target.value })}
-                                                            className={inputCls} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Email</label>
-                                                        <input type="email" placeholder="provider@email.com"
-                                                            disabled={!hasPermission('change_projectdomain')}
-                                                            value={domain.provider_detail?.email || ''}
-                                                            onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), email: e.target.value })}
-                                                            className={inputCls} />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className={labelCls}>Phone</label>
-                                                        <input type="text" placeholder="+1..."
-                                                            disabled={!hasPermission('change_projectdomain')}
-                                                            value={domain.provider_detail?.phone || ''}
-                                                            onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), phone: e.target.value })}
-                                                            className={inputCls} />
-                                                    </div>
+                                                            onClick={() => handleBillItem('domain', domain.name || 'Domain', domain.cost || 0, domain.purchase_date, domain.expiration_date, domain.id)}
+                                                            className={`h-[46px] px-3 bg-emerald-500/10 text-emerald-500 rounded-xl transition-all border border-emerald-500/20 flex items-center gap-2 ${hasPermission('change_projectdomain') ? 'hover:bg-emerald-500/20' : 'opacity-60 cursor-not-allowed'}`}
+                                                            title="Generate Invoice"
+                                                        >
+                                                            <Receipt size={18} />
+                                                            <span className="text-[10px] font-black uppercase">Bill</span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
-                                        )}
+                                            {domain.accrued_by === 'Third Party' && (
+                                                <div className="lg:col-span-3 pt-4 border-t border-border/30">
+                                                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                                        🏢 Provider Details
+                                                    </p>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                                        <div className="space-y-1">
+                                                            <label className={labelCls}>Company Name</label>
+                                                            <input type="text" placeholder="e.g. GoDaddy Inc."
+                                                                disabled={!hasPermission('change_projectdomain')}
+                                                                value={domain.provider_detail?.company_name || ''}
+                                                                onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), company_name: e.target.value })}
+                                                                className={inputCls} />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className={labelCls}>Contact Person</label>
+                                                            <input type="text" placeholder="Manager Name"
+                                                                disabled={!hasPermission('change_projectdomain')}
+                                                                value={domain.provider_detail?.contact_person || ''}
+                                                                onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), contact_person: e.target.value })}
+                                                                className={inputCls} />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className={labelCls}>Email</label>
+                                                            <input type="email" placeholder="provider@email.com"
+                                                                disabled={!hasPermission('change_projectdomain')}
+                                                                value={domain.provider_detail?.email || ''}
+                                                                onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), email: e.target.value })}
+                                                                className={inputCls} />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className={labelCls}>Phone</label>
+                                                            <input type="text" placeholder="+1..."
+                                                                disabled={!hasPermission('change_projectdomain')}
+                                                                value={domain.provider_detail?.phone || ''}
+                                                                onChange={e => setNested('project_domains', idx, 'provider_detail', { ...(domain.provider_detail || {}), phone: e.target.value })}
+                                                                className={inputCls} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                            {hasPermission('view_projectserver') && formData.project_servers?.map((server: any, idx: number) => (
+                                ))}
+
+
+
+                            {infraTab === 'servers' && hasPermission('view_projectserver') && formData.project_servers?.map((server: any, idx: number) => (
                                 <div key={idx} className="p-6 bg-indigo-500/5 border border-indigo-500/20 rounded-[2rem] space-y-4">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[11px] font-black text-indigo-500 uppercase tracking-widest">🖥️ Server #{idx + 1}</span>
@@ -2485,7 +2538,10 @@ const ProjectForm: React.FC = () => {
                                     </div>
                                 </div>
                             ))}
-                            {hasPermission('view_projectexbot') && formData.project_exbots?.map((exbot: any, idx: number) => (
+
+
+
+                            {infraTab === 'exbots' && hasPermission('view_projectexbot') && formData.project_exbots?.map((exbot: any, idx: number) => (
                                 <div key={idx} className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-[2rem] space-y-4">
                                     <div className="flex items-center justify-between">
                                         <span className="text-[11px] font-black text-emerald-500 uppercase tracking-widest">🤖 Exbot #{idx + 1}</span>
